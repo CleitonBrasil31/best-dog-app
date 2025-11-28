@@ -1,0 +1,22 @@
+Para Mudar o SOm
+
+Pegue seu arquivo de som (ex: alerta.mp3).
+
+Coloque-o na pasta public do seu projeto React.
+
+No código abaixo, procure a linha const SOM_URL = ... e mude para: const SOM_URL = "/alerta.mp3";.
+
+
+-------------
+
+Comandos GITHUB 
+
+Adiciona ao git
+git add .
+
+Comenta "versão" da melhoria
+git commit -m "Melhoria tal"
+
+Publica
+git push
+
