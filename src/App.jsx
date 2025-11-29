@@ -13,11 +13,11 @@ import {
 import { createClient } from '@supabase/supabase-js';
 
 // --- CONFIGURAÇÃO SUPABASE (COLE SUAS CHAVES AQUI) ---
-const supabaseUrl = 'SUA_URL_SUPABASE'; 
-const supabaseKey = 'SUA_CHAVE_ANON_PUBLIC';
+const supabaseUrl = 'https://nkxumeebdwbdpdmajwdu.supabase.co'; 
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5reHVtZWViZHdiZHBkbWFqd2R1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyOTA3MDEsImV4cCI6MjA3OTg2NjcwMX0.iPMYUJWQQzn--nEWBjf4_wHuFi7HZkZVXRlRpb94Tyw';
 
 // Inicialização segura (evita erro se as chaves não estiverem lá)
-const supabase = (supabaseUrl !== 'SUA_URL_SUPABASE') ? createClient(supabaseUrl, supabaseKey) : null;
+const supabase = (supabaseUrl !== 'https://nkxumeebdwbdpdmajwdu.supabase.co') ? createClient(supabaseUrl, supabaseKey) : null;
 
 const SOM_URL = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"; 
 
