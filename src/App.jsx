@@ -13,16 +13,11 @@ import {
 import { createClient } from '@supabase/supabase-js';
 
 // --- CONFIGURAÇÃO SUPABASE (COLE SUAS CHAVES AQUI) ---
-// Se não colar as chaves reais aqui, o sistema não salva!
-const supabaseUrl = 'https://nkxumeebdwbdpdmajwdu.supabase.co';
+const supabaseUrl = 'https://nkxumeebdwbdpdmajwdu.supabase.co'; 
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5reHVtZWViZHdiZHBkbWFqd2R1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyOTA3MDEsImV4cCI6MjA3OTg2NjcwMX0.iPMYUJWQQzn--nEWBjf4_wHuFi7HZkZVXRlRpb94Tyw';
-const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Inicialização segura do cliente
-const supabase = (supabaseUrl !== 'https://nkxumeebdwbdpdmajwdu.supabase.coE') 
-  ? createClient(supabaseUrl, supabaseKey) 
-  : null;
-
+// Inicialização segura
+const supabase = (supabaseUrl !== 'https://nkxumeebdwbdpdmajwdu.supabase.co') ? createClient(supabaseUrl, supabaseKey) : null;
 
 const SOM_URL = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"; 
 
@@ -64,11 +59,8 @@ function App() {
   const [taxasFrete, setTaxasFrete] = useState([]);
   const [montagemItens, setMontagemItens] = useState([]);
 
-  // --- CONFIG ---
-  const [darkMode, setDarkMode] = useState(() => {
-      const saved = localStorage.getItem('bd_darkmode');
-      return saved !== null ? JSON.parse(saved) : true; // Padrão Dark
-  });
+  // --- CONFIGURAÇÕES ---
+  const [darkMode, setDarkMode] = useState(true); // Padrão Dark
   const [logoUrl, setLogoUrl] = useState(() => localStorage.getItem('bd_logo_url') || '');
   const [filtroData, setFiltroData] = useState(new Date().toISOString().split('T')[0]);
 
@@ -78,26 +70,17 @@ function App() {
 
   // --- INICIALIZAÇÃO ---
   useEffect(() => {
-    if (darkMode) document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
-    localStorage.setItem('bd_darkmode', JSON.stringify(darkMode));
-  }, [darkMode]);
+    document.documentElement.classList.add('dark'); // Força Dark Mode sempre
+  }, []);
 
   useEffect(() => { localStorage.setItem('bd_logo_url', logoUrl); }, [logoUrl]);
 
   // --- SYNC SUPABASE ---
   const fetchDados = async () => {
       if(!supabase) {
-          // DADOS MOCKADOS SE NÃO TIVER SUPABASE CONECTADO
-          setTaxasFrete(JSON.parse(localStorage.getItem('bd_v35_taxas')) || [{id:1, nome:'Centro', valor:5}]);
-          setProdutos(JSON.parse(localStorage.getItem('bd_v35_produtos')) || [{id:1, nome:'Dog Simples', preco:15, categoria:'Lanches', tipo:'principal'}]);
-          setClientes(JSON.parse(localStorage.getItem('bd_v35_clientes')) || []);
-          setPedidos(JSON.parse(localStorage.getItem('bd_v35_pedidos')) || []);
-          // Mock Montagem
-          const m = JSON.parse(localStorage.getItem('bd_v35_montagem'));
-          if(m) {
-              // Converter estrutura antiga para nova lista plana se necessário, aqui simplificado
-          }
+          // DADOS DE EXEMPLO SE NÃO TIVER CONECTADO
+          setTaxasFrete([{id:1, nome:'Centro', valor:5}]);
+          setProdutos([{id:1, nome:'Dog Simples', preco:15, categoria:'Lanches', tipo:'principal'}]);
           setLoading(false);
           return;
       }
@@ -134,9 +117,6 @@ function App() {
 
   // --- CONFIG MONTAGEM (COMPUTADA) ---
   const configMontagem = useMemo(() => {
-      // Se estiver usando LocalStorage (modo fallback), usa estrutura antiga, senão filtra do array plano
-      if(!supabase) return JSON.parse(localStorage.getItem('bd_v35_montagem')) || { paes:[], queijos:[], salsichas:[], molhos:[], adicionais:[] };
-      
       return {
           paes: montagemItens.filter(i => i.categoria === 'paes'),
           queijos: montagemItens.filter(i => i.categoria === 'queijos'),
@@ -190,7 +170,7 @@ function App() {
           troco_para: Number(formPedido.trocoPara),
           desconto: Number(formPedido.desconto),
           observacoes: formPedido.observacoes,
-          data: filtroData, // Usa data do filtro ou hoje
+          data: filtroData, 
           hora: new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'}),
           status: formPedido.id ? formPedido.status : 'Pendente'
       };
@@ -198,10 +178,6 @@ function App() {
       if(supabase) {
           if(formPedido.id) await supabase.from('pedidos').update(payload).eq('id', formPedido.id);
           else { await supabase.from('pedidos').insert([payload]); tocarSom(); }
-      } else {
-          // Fallback LocalStorage
-          const novos = formPedido.id ? pedidos.map(p => p.id === formPedido.id ? {...payload, id: p.id} : p) : [...pedidos, {...payload, id: Date.now()}];
-          setPedidos(novos); localStorage.setItem('bd_v35_pedidos', JSON.stringify(novos));
       }
       setModalPedidoAberto(false);
   };
@@ -221,8 +197,8 @@ function App() {
       montagem.molhoIds.forEach(id => addDetalhe(id, configMontagem.molhos));
       montagem.adicionalIds.forEach(id => addDetalhe(id, configMontagem.adicionais));
 
-      const precoFinal = 15.00 + pao.valor + salsicha.valor + totalExtras;
-      const itemMontado = { produtoId: 999, nome: 'Dog Montado', preco: parseFloat(precoFinal.toFixed(2)), qtd: 1, opcoesSelecionadas: [detalhes.join('\n')], listaAdicionais: [] };
+      const precoFinal = parseFloat((15.00 + pao.valor + salsicha.valor + totalExtras).toFixed(2));
+      const itemMontado = { produtoId: 999, nome: 'Dog Montado', preco: precoFinal, qtd: 1, opcoesSelecionadas: [detalhes.join('\n')], listaAdicionais: [] };
       
       // Remove itens vazios antes de adicionar
       const itensAtuais = formPedido.itens.filter(i => i.produtoId);
@@ -231,40 +207,57 @@ function App() {
       setModalPedidoAberto(true);
   };
 
-  // CRUD Genérico
+  // CRUD PRODUTOS
   const handleSaveProduto = async (e) => {
       e.preventDefault();
+      if(!supabase) return alert("Erro: Supabase não conectado");
       const dados = { ...formProduto, preco: Number(formProduto.preco), estoque: Number(formProduto.estoque) };
-      if(supabase) {
-          if(formProduto.id) await supabase.from('produtos').update(dados).eq('id', formProduto.id);
-          else await supabase.from('produtos').insert([dados]);
-      } else {
-          const novos = formProduto.id ? produtos.map(p => p.id === formProduto.id ? {...dados, id: p.id} : p) : [...produtos, {...dados, id: Date.now()}];
-          setProdutos(novos); localStorage.setItem('bd_v35_produtos', JSON.stringify(novos));
-      }
+      if(formProduto.id) await supabase.from('produtos').update(dados).eq('id', formProduto.id);
+      else await supabase.from('produtos').insert([dados]);
       setModalProdutoAberto(false);
   };
 
+  const handleExcluirProduto = async (id) => { if(confirm("Excluir?")) await supabase.from('produtos').delete().eq('id', id); };
+
+  // CRUD CLIENTES
   const handleSaveCliente = async (e) => {
       e.preventDefault();
-      if(supabase) {
-          if(formCliente.id) await supabase.from('clientes').update(formCliente).eq('id', formCliente.id);
-          else await supabase.from('clientes').insert([formCliente]);
-      } else {
-          const novos = formCliente.id ? clientes.map(c => c.id === formCliente.id ? {...formCliente, id: c.id} : c) : [...clientes, {...formCliente, id: Date.now()}];
-          setClientes(novos); localStorage.setItem('bd_v35_clientes', JSON.stringify(novos));
-      }
+      if(!supabase) return;
+      if(formCliente.id) await supabase.from('clientes').update(formCliente).eq('id', formCliente.id);
+      else await supabase.from('clientes').insert([formCliente]);
       setModalClienteAberto(false);
   };
 
-  const handleExcluir = async (tabela, id, setter, lista) => {
-      if(!confirm("Tem certeza?")) return;
-      if(supabase) await supabase.from(tabela).delete().eq('id', id);
-      else {
-          const novos = lista.filter(i => i.id !== id);
-          setter(novos);
-          localStorage.setItem(`bd_v35_${tabela}`, JSON.stringify(novos));
-      }
+  const handleExcluirCliente = async (id) => { if(confirm("Excluir?")) await supabase.from('clientes').delete().eq('id', id); };
+
+  // CRUD TAXAS & MONTAGEM
+  const salvarTaxa = async (e) => {
+      e.preventDefault();
+      if(!supabase) return;
+      await supabase.from('taxas').insert([{ nome: novaTaxa.nome, valor: parseFloat(novaTaxa.valor) }]);
+      setNovaTaxa({ nome: '', valor: '' });
+  };
+  
+  const excluirTaxa = async (id) => { if(confirm("Remover?")) await supabase.from('taxas').delete().eq('id', id); };
+
+  const adicionarItemConfig = async () => { 
+      if (!novoItemMontagem.nome) return; 
+      if(!supabase) return;
+      await supabase.from('montagem_itens').insert([{ 
+          categoria: novoItemMontagem.categoria, 
+          nome: novoItemMontagem.nome, 
+          valor: parseFloat(novoItemMontagem.valor || 0) 
+      }]);
+      setNovoItemMontagem({ ...novoItemMontagem, nome: '', valor: '' }); 
+  };
+  const removerItemConfig = async (id) => { await supabase.from('montagem_itens').delete().eq('id', id); };
+
+  const avançarStatus = async (id) => {
+      const pedido = pedidos.find(p => p.id === id);
+      if(!pedido) return;
+      let novo = pedido.status === 'Pendente' ? 'Saiu para Entrega' : 'Concluido';
+      if(supabase) await supabase.from('pedidos').update({ status: novo }).eq('id', id);
+      if(novo === 'Saiu para Entrega') setTimeout(() => enviarZap({...pedido, status: novo}), 100);
   };
 
   // --- FILTROS ---
@@ -276,7 +269,32 @@ function App() {
       return { total, qtd: concluidos.length, ticket: concluidos.length ? total / concluidos.length : 0 };
   }, [pedidosFiltrados]);
 
-  // --- IMPRESSÃO ---
+  // --- UI HELPERS ---
+  const abrirNovoPedido = () => { setFormPedido(getFormPedidoInicial()); setModalPedidoAberto(true); };
+  const abrirMonteDog = () => { setFormPedido(getFormPedidoInicial()); setModalMonteDogAberto(true); }; // Garante reset
+  const abrirNovoProduto = () => { setFormProduto({ nome:'', descricao:'', preco:'', estoque:'', opcoes:'', tipo:'principal', categoria:'Lanches' }); setModalProdutoAberto(true); };
+  const abrirNovoCliente = () => { setFormCliente({ nome:'', telefone:'', endereco:'', obs:'' }); setModalClienteAberto(true); };
+
+  const editarPedido = (p) => { setFormPedido({...p, itens: p.itens || [], clienteId: null, taxaEntrega: p.taxa_entrega, trocoPara: p.troco_para }); setModalPedidoAberto(true); }; 
+  const editarCliente = (c) => { setFormCliente(c); setModalClienteAberto(true); };
+  const editarProduto = (p) => { setFormProduto(p); setModalProdutoAberto(true); };
+  
+  const selecionarClienteNoPedido = (id) => { const c = clientes.find(x => x.id == id); if(c) setFormPedido({...formPedido, clienteId: c.id, nome: c.nome, endereco: c.endereco, telefone: c.telefone, taxaEntrega: 0}); };
+  const atualizarItem = (idx, f, v) => { const ns = [...formPedido.itens]; ns[idx][f] = v; if(f === 'produtoId') { const p = produtos.find(x => x.id == v); if(p) { ns[idx].nome = p.nome; ns[idx].preco = p.preco; ns[idx].opcoesSelecionadas = []; ns[idx].listaAdicionais = []; } } setFormPedido({...formPedido, itens: ns}); };
+  const toggleAdicionalItem = (idx, id) => { const ns = [...formPedido.itens]; const l = ns[idx].listaAdicionais || []; ns[idx].listaAdicionais = l.includes(id) ? l.filter(x => x !== id) : [...l, id]; setFormPedido({...formPedido, itens: ns}); };
+  const toggleOpcaoItem = (idx, opcao) => { const ns = [...formPedido.itens]; const atuais = ns[idx].opcoesSelecionadas || []; if (atuais.includes(opcao)) { ns[idx].opcoesSelecionadas = atuais.filter(o => o !== opcao); } else { ns[idx].opcoesSelecionadas = [...atuais, opcao]; } setFormPedido({...formPedido, itens: ns}); };
+  const toggleMultiplo = (campo, id) => { const lista = montagem[campo]; setMontagem({ ...montagem, [campo]: lista.includes(id) ? lista.filter(i => i !== id) : [...lista, id] }); };
+
+  const enviarZap = (p) => {
+    let msgTroco = "";
+    if(p.pagamento === 'Dinheiro' && p.troco_para) msgTroco = `\n💵 *Troco p/ ${formatarMoeda(p.troco_para)}* (Devolver: ${formatarMoeda(Number(p.troco_para) - p.total)})`;
+    else if (p.pagamento !== 'Dinheiro') msgTroco = `\n💳 Levar Maquininha (${p.pagamento})`;
+    const saudacao = p.status === 'Saiu para Entrega' ? `🛵 *SEU PEDIDO SAIU!*` : `Olá ${p.cliente?.nome || ''}! 🌭🔥`;
+    const txt = `${saudacao}\n\n*PEDIDO #${p.id}*\n📍 ${p.cliente?.endereco || 'Balcão'}\n\n${p.itens.map(i => `${i.qtd}x ${i.nome}\n   ${(i.opcoesSelecionadas||[]).join('\n   ')}`).join('\n')}\n\n💰 *Total: ${formatarMoeda(p.total)}*${msgTroco}`;
+    window.open(`https://wa.me/55${p.cliente?.telefone?.replace(/\D/g,'')}?text=${encodeURIComponent(txt)}`, '_blank');
+  };
+  const abrirNoMaps = (end) => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(end)}`, '_blank');
+
   const imprimir = (p) => {
     const subtotal = p.itens.reduce((acc, i) => {
         const base = Number(i.preco);
@@ -288,38 +306,7 @@ function App() {
     }, 0);
     
     const html = `
-    <html><head><style>
-      @page { margin: 0; size: 80mm auto; }
-      body { font-family: 'Courier New', monospace; width: 72mm; margin: 0; padding: 5px; color: #000; font-size: 12px; }
-      .center { text-align: center; } .bold { font-weight: bold; } .line { border-bottom: 1px dashed #000; margin: 5px 0; }
-      .row { display: flex; justify-content: space-between; } .big { font-size: 14px; } .huge { font-size: 18px; }
-      .item { padding: 3px 0; border-bottom: 1px dotted #ccc; }
-      .details { font-size: 11px; padding-left: 5px; white-space: pre-wrap; }
-    </style></head><body>
-      <div class="center huge bold">BEST DOG</div><div class="center">Delivery</div><div class="line"></div>
-      <div class="row"><span class="bold">#${p.id?.toString().slice(-4)}</span><span>${p.hora}</span></div>
-      <div class="line"></div>
-      <div class="big bold">${p.cliente.nome}</div><div>${p.cliente.endereco}</div><div>${p.cliente.telefone}</div>
-      <div class="line"></div>
-      ${p.itens.map(i => {
-          let desc = "";
-          if(i.produtoId === 999) desc = i.opcoesSelecionadas[0];
-          else {
-             if(i.opcoesSelecionadas) i.opcoesSelecionadas.forEach(o => desc += `> ${extrairNomeOpcao(o)}\n`);
-             if(i.listaAdicionais) i.listaAdicionais.forEach(aid => { const prod = produtos.find(x=>x.id===aid); if(prod) desc += `+ ${prod.nome}\n`; });
-          }
-          return `<div class="item"><div class="row bold"><span>${i.qtd}x ${i.nome}</span><span>${formatarMoeda((Number(i.preco) + (i.produtoId!==999 ? desc.split('\n').length : 0)) * i.qtd)}</span></div><div class="details">${desc}</div></div>`;
-      }).join('')}
-      ${p.observacoes ? `<div class="line"></div><div class="bold">OBS: ${p.observacoes}</div>` : ''}
-      <div class="line"></div>
-      <div class="row"><span>Subtotal</span><span>${formatarMoeda(subtotal)}</span></div>
-      <div class="row"><span>Entrega</span><span>${formatarMoeda(p.taxa_entrega)}</span></div>
-      ${p.desconto > 0 ? `<div class="row"><span>Desconto</span><span>-${formatarMoeda(subtotal * (p.desconto/100))}</span></div>` : ''}
-      <div class="row big bold" style="margin-top:5px"><span>TOTAL</span><span>${formatarMoeda(p.total)}</span></div>
-      <div class="center" style="margin-top:10px; border: 1px solid #000; padding: 5px;">${p.pagamento}<br/>${p.pagamento==='Dinheiro' && p.troco_para ? `Troco p/ ${formatarMoeda(p.troco_para)}` : ''}</div>
-      <script>window.onload=()=>{window.print();setTimeout(()=>{window.close()},500)}</script>
-    </body></html>`;
-
+    <html><head><style>@page{margin:0;size:80mm auto}body{font-family:'Courier New',monospace;width:72mm;margin:0;padding:5px;color:#000;font-size:12px}.header{text-align:center;margin-bottom:10px;border-bottom:2px solid #000;padding-bottom:10px}.title{font-size:20px;font-weight:900;margin:0}.meta{font-size:12px;display:flex;justify-content:space-between;margin-top:5px;font-weight:bold}.section{margin-bottom:10px;padding-bottom:10px;border-bottom:1px dashed #000}.client-name{font-size:16px;font-weight:800;text-transform:uppercase}.client-address{font-size:14px;margin-top:4px;font-weight:600;line-height:1.2}.item-box{padding:6px 0;border-bottom:1px dotted #999}.item-header{font-size:13px;font-weight:800;display:flex;justify-content:space-between}.item-details{margin-top:2px;font-size:11px;color:#000;white-space:pre-wrap;line-height:1.2;padding-left:5px}.totals{margin-top:10px}.row{display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px}.total-final{font-size:24px;font-weight:900;text-align:right;border-top:2px solid #000;margin-top:10px;padding-top:5px}.payment{font-size:12px;border:1px solid #000;padding:5px;text-align:center;font-weight:800;margin-top:5px}.obs{background:#000;color:#fff;padding:5px;font-weight:bold;font-size:12px;text-align:center;margin-top:5px}.footer{text-align:center;margin-top:10px;font-size:10px;margin-bottom:20px}@media print{body{-webkit-print-color-adjust:exact}}</style></head><body><div class="header"><div class="title">BEST DOG</div><div class="meta"><span>#${p.id}</span><span>${p.hora}</span></div></div><div class="section"><div class="client-name">${p.cliente?.nome||'CLIENTE BALCÃO'}</div><div class="client-address">${p.cliente?.endereco||'Retirada'}</div><div>${p.cliente?.telefone||''}</div></div><div class="section">${p.itens.map(i=>{const pBase=Number(i.preco||0);const pOpcoes=(i.opcoesSelecionadas||[]).reduce((s,op)=>s+extrairValorOpcao(op),0);const pAdics=i.listaAdicionais?i.listaAdicionais.reduce((s,adId)=>{const pr=produtos.find(x=>x.id===adId);return s+(pr?Number(pr.preco):0)},0):0;const totalItem=(pBase+pOpcoes+pAdics)*i.qtd;let detalhesTexto="";if(i.produtoId===999){detalhesTexto=i.opcoesSelecionadas?i.opcoesSelecionadas[0]:""}else{if(i.opcoesSelecionadas&&i.opcoesSelecionadas.length>0){i.opcoesSelecionadas.forEach(op=>detalhesTexto+=`> ${extrairNomeOpcao(op)}\n`)}if(i.listaAdicionais?.length>0)i.listaAdicionais.forEach(adId=>{const ad=produtos.find(x=>x.id===adId);if(ad)detalhesTexto+=`+ ${ad.nome} (${formatarMoeda(ad.preco)})\n`})}return `<div class="item-box"><div class="item-header"><span>${i.qtd}x ${i.nome.toUpperCase()}</span><span>${formatarMoeda(totalItem)}</span></div>${detalhesTexto?`<div class="item-details">${detalhesTexto}</div>`:''}</div>`}).join('')}</div>${p.observacoes?`<div class="obs">OBS: ${p.observacoes.toUpperCase()}</div>`:''}<div class="totals"><div class="row"><span>Subtotal</span><span>${formatarMoeda(subtotal)}</span></div>${p.desconto>0?`<div class="row"><span>Desc. (${p.desconto}%)</span><span>- ${formatarMoeda(subtotal*(p.desconto/100))}</span></div>`:''}<div class="row"><span>Entrega</span><span>${formatarMoeda(Number(p.taxa_entrega))}</span></div><div class="total-final">TOTAL: ${formatarMoeda(p.total)}</div><div class="payment">${p.pagamento}${p.pagamento==='Dinheiro'&&p.troco_para?`<br>Troco p/ ${formatarMoeda(p.troco_para)}<br>Devolver: ${formatarMoeda(p.troco_para-p.total)}`:''}</div></div><div class="footer">*** Obrigado pela preferência! ***</div></body></html>`;
     const win = window.open('', '_blank', 'width=400,height=600');
     if(win) { win.document.write(html); win.document.close(); } else { alert("Permita Pop-ups!"); }
   };
@@ -327,174 +314,145 @@ function App() {
   if (loading) return <div className="h-screen flex items-center justify-center bg-zinc-950 text-white"><Loader2 className="animate-spin mr-2"/> Carregando...</div>;
 
   return (
-    <div className={`flex h-screen font-sans overflow-hidden ${darkMode ? 'dark bg-slate-900' : 'bg-amber-50'}`}>
+    <div className="flex h-screen font-sans overflow-hidden dark bg-zinc-950 text-zinc-100">
       <audio id="audio-alerta" src={SOM_URL} />
 
-      <aside className="hidden md:flex flex-col w-64 bg-slate-900 dark:bg-black border-r border-slate-800 text-white shadow-2xl z-20">
-        <div className="p-6 flex items-center gap-3 border-b border-slate-800">
-          {logoUrl ? <img src={logoUrl} className="w-10 h-10 rounded-lg bg-white object-cover"/> : <Utensils size={24}/>}
-          <div><h1 className="font-extrabold text-2xl tracking-tight">BEST DOG</h1><p className="text-xs text-slate-400">v48.0</p></div>
-        </div>
+      {/* MENU LATERAL */}
+      <aside className="hidden md:flex flex-col w-64 bg-zinc-900 border-r border-zinc-800 text-white shadow-2xl z-20">
+        <div className="p-6 flex items-center gap-3 border-b border-zinc-800">{logoUrl ? <img src={logoUrl} alt="Logo" className="w-10 h-10 rounded-lg object-cover ring-2 ring-zinc-700"/> : <div className="bg-gradient-to-br from-yellow-500 to-red-600 p-2 rounded-xl shadow-lg transform -rotate-6"><Utensils size={24} className="text-white"/></div>}<div><h1 className="font-extrabold text-2xl tracking-tight italic text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-500">BEST DOG</h1><p className="text-xs text-zinc-500 font-bold">Online v49.0</p></div></div>
         <nav className="flex-1 p-4 space-y-2">
-           {[ 
-             {id: 'dashboard', icon: Home, label: 'Visão Geral'}, 
-             {id: 'montagem', icon: Layers, label: 'Monte seu Dog'}, 
-             {id: 'pedidos', icon: ClipboardList, label: 'Pedidos', count: pedidosPendentes.length},
-             {id: 'vendas', icon: DollarSign, label: 'Vendas (Caixa)'},
-             {id: 'produtos', icon: Package, label: 'Cardápio'},
-             {id: 'clientes', icon: Users, label: 'Clientes'},
-             {id: 'config', icon: Settings, label: 'Configurações'}
-           ].map(item => (
-             <button key={item.id} onClick={() => setAbaAtiva(item.id)} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${abaAtiva === item.id ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'}`}>
-               <div className="flex items-center gap-3"><item.icon size={20}/> <span>{item.label}</span></div>
-               {item.count > 0 && <span className="bg-white text-red-900 text-xs font-black px-2 py-0.5 rounded-full">{item.count}</span>}
-             </button>
+           {[ {id: 'dashboard', icon: Home, label: 'Visão Geral'}, {id: 'montagem', icon: Layers, label: 'Monte seu Dog'}, {id: 'pedidos', icon: ClipboardList, label: 'Pedidos', count: pedidosPendentes.length}, {id: 'vendas', icon: DollarSign, label: 'Caixa & Gestão'}, {id: 'produtos', icon: Package, label: 'Cardápio'}, {id: 'clientes', icon: Users, label: 'Clientes'}, {id: 'config', icon: Settings, label: 'Configurações'} ].map(item => (
+             <button key={item.id} onClick={() => setAbaAtiva(item.id)} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 font-bold ${abaAtiva === item.id ? 'bg-gradient-to-r from-red-600/20 to-red-900/20 text-red-400 border border-red-900/30' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100'}`}><div className="flex items-center gap-3"><item.icon size={20} className={abaAtiva === item.id ? 'text-red-500' : ''}/> <span>{item.label}</span></div>{item.id === 'pedidos' && item.count > 0 && <span className="bg-red-600 text-white text-xs font-black px-2 py-0.5 rounded-full">{item.count}</span>}</button>
            ))}
         </nav>
-        <div className="p-4 border-t border-slate-800 flex justify-center"><button onClick={() => setDarkMode(!darkMode)} className="flex items-center gap-2 text-sm text-yellow-400">{darkMode ? <Sun size={16}/> : <Moon size={16}/>} Tema</button></div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto bg-amber-50/50 dark:bg-slate-900 transition-colors p-4 md:p-8">
-        <div className="max-w-7xl mx-auto w-full space-y-6">
-            
-            {/* --- DASHBOARD --- */}
+      <main className="flex-1 overflow-y-auto relative flex flex-col bg-zinc-950">
+        {/* HEADER MOBILE */}
+        <header className="md:hidden bg-zinc-900 text-white p-4 flex justify-between items-center shadow-md sticky top-0 z-10 border-b border-zinc-800">
+           <div className="flex items-center gap-2 font-extrabold italic text-xl">{logoUrl ? <img src={logoUrl} alt="Logo" className="w-8 h-8 rounded object-cover"/> : <Utensils className="text-yellow-500"/>} BEST DOG</div>
+           {pedidosPendentes.length > 0 && <span className="text-xs bg-red-600 text-yellow-100 font-bold px-3 py-1 rounded-full shadow-sm">{pedidosPendentes.length}</span>}
+        </header>
+
+        <div className="p-4 md:p-8 pb-24 md:pb-8 max-w-7xl mx-auto w-full">
+            {!supabase && <div className="bg-red-600 text-white p-4 rounded-xl mb-6 font-bold animate-pulse">⚠️ ATENÇÃO: COLE SUAS CHAVES DO SUPABASE!</div>}
+
             {abaAtiva === 'dashboard' && (
-              <>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <button onClick={abrirNovoPedido} className="py-6 bg-gradient-to-br from-red-600 to-orange-600 text-white rounded-2xl shadow-lg font-black text-2xl flex justify-center items-center gap-3 hover:scale-[1.02] transition"><Plus size={32}/> NOVO PEDIDO</button>
-                     <button onClick={abrirMonteDog} className="py-6 bg-indigo-600 text-white rounded-2xl shadow-lg font-black text-2xl flex justify-center items-center gap-3 hover:scale-[1.02] transition"><Edit3 size={32}/> MONTE SEU DOG</button>
+              <div className="space-y-4">
+                 <button onClick={abrirNovoPedido} className="w-full bg-gradient-to-br from-red-600 to-orange-600 text-white py-5 rounded-2xl shadow-lg hover:from-red-500 hover:to-orange-500 transition transform active:scale-95 font-black text-xl md:text-2xl flex justify-center items-center gap-3 border border-red-500/30"><Plus size={32} strokeWidth={3} className="bg-white/20 rounded-full p-1"/> NOVO PEDIDO AGORA</button>
+                 <button onClick={abrirMonteDog} className="w-full py-4 bg-indigo-900/50 text-indigo-200 font-extrabold rounded-xl border border-indigo-500/30 hover:bg-indigo-900 hover:text-white flex justify-center items-center gap-3 active:scale-95 transition-all"><Edit3 size={22} className="text-indigo-400"/> MONTE SEU DOG</button>
+                 <div className="mt-4">
+                    <h3 className="font-extrabold text-zinc-400 flex items-center gap-2 mb-3 uppercase text-sm tracking-wider"><Flame size={18} className="text-orange-500"/> Fila de Produção ({pedidosPendentes.length})</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {pedidosPendentes.length === 0 ? <div className="col-span-full text-center p-10 bg-zinc-900 rounded-xl border border-zinc-800 border-dashed text-zinc-600 italic">Nenhum pedido na chapa...</div> : pedidosPendentes.map(p => (
+                           <div key={p.id} className="bg-zinc-900 rounded-lg shadow-sm border border-zinc-800 flex flex-col relative overflow-hidden hover:border-zinc-700 transition-all">
+                              <div className={`h-1 w-full ${p.status === 'Saiu para Entrega' ? 'bg-orange-500' : 'bg-red-500'}`}></div>
+                              <div className="p-3 flex flex-col gap-1">
+                                 <div className="flex justify-between items-center"><span className="font-black text-white text-lg">#{p.id?.toString().slice(-4)}</span><div className="flex items-center gap-2"><button onClick={() => abrirNoMaps(p.cliente?.endereco || '')} className="text-blue-400 bg-blue-900/20 p-1 rounded hover:bg-blue-900/40"><Map size={14}/></button><Badge status={p.status}/></div></div>
+                                 <div className="text-sm font-bold text-zinc-300 truncate">{p.cliente?.nome}</div>
+                                 <div className="text-xs text-zinc-500 mb-2 flex items-center gap-1"><Utensils size={10}/> {(p.itens||[]).length} itens • {p.hora}</div>
+                                 <div className="text-xs text-zinc-400 bg-zinc-950 border-l-4 border-zinc-700 pl-2 py-1 mb-2 font-medium">{(p.itens||[]).map(i => `${i.qtd}x ${i.nome}`).join(', ').substring(0, 60)}{p.itens?.length > 2 ? '...' : ''}</div>
+                                 <div className="flex justify-between items-end mt-auto pt-2 border-t border-zinc-800">
+                                    <div><div className="text-[10px] uppercase text-zinc-500 font-bold">{p.pagamento}</div><div className="font-black text-red-500 text-lg">{formatarMoeda(p.total)}</div></div>
+                                    <div className="flex gap-1"><button onClick={() => imprimir(p)} className="p-1.5 bg-zinc-800 text-zinc-300 rounded hover:bg-zinc-700"><Printer size={14}/></button><button onClick={() => enviarZap(p)} className="p-1.5 bg-green-900/30 text-green-400 rounded hover:bg-green-900/50"><MessageCircle size={14}/></button><button onClick={() => editarPedido(p)} className="p-1.5 bg-amber-900/30 text-amber-500 rounded hover:bg-amber-900/50"><Pencil size={14}/></button></div>
+                                 </div>
+                              </div>
+                              <button onClick={() => avançarStatus(p.id)} className={`w-full py-2 text-xs font-bold text-white flex items-center justify-center gap-1 ${p.status === 'Pendente' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}>{p.status === 'Pendente' ? <><ArrowRight size={14}/> MANDAR ENTREGA</> : <><CheckCircle size={14}/> CONCLUIR</>}</button>
+                           </div>
+                        ))}
+                    </div>
                  </div>
-                 <h3 className="font-bold text-xl dark:text-white flex items-center gap-2"><Flame className="text-orange-500"/> Fila de Produção ({pedidosPendentes.length})</h3>
-                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {pedidosPendentes.map(p => (
-                       <Card key={p.id} className="p-4 flex flex-col gap-2 border-l-4 border-l-orange-500">
-                          <div className="flex justify-between items-center"><span className="font-black text-lg dark:text-white">#{p.id?.toString().slice(-4)}</span><Badge status={p.status}/></div>
-                          <div className="text-sm dark:text-gray-300 font-bold">{p.cliente.nome}</div>
-                          <div className="text-xs text-gray-500">{p.hora} • {p.cliente.endereco}</div>
-                          <div className="bg-gray-50 dark:bg-slate-700 p-2 rounded text-xs dark:text-gray-200 max-h-20 overflow-y-auto">{(p.itens||[]).map(i => `${i.qtd}x ${i.nome}`).join(', ')}</div>
-                          <div className="flex justify-between items-end pt-2 border-t dark:border-gray-700 mt-auto">
-                             <span className="font-black text-red-500">{formatarMoeda(p.total)}</span>
-                             <div className="flex gap-1">
-                                <button onClick={() => imprimir(p)} className="p-1.5 bg-gray-100 dark:bg-slate-600 rounded"><Printer size={14}/></button>
-                                <button onClick={() => enviarZap(p)} className="p-1.5 bg-green-100 text-green-600 rounded"><MessageCircle size={14}/></button>
-                                <button onClick={() => editarPedido(p)} className="p-1.5 bg-amber-100 text-amber-600 rounded"><Pencil size={14}/></button>
-                             </div>
-                          </div>
-                          <button onClick={() => avançarStatus(p.id)} className="w-full py-2 bg-green-600 text-white text-xs font-bold rounded mt-1">{p.status === 'Pendente' ? 'ENVIAR' : 'CONCLUIR'}</button>
-                       </Card>
-                    ))}
-                 </div>
-              </>
+              </div>
             )}
 
-            {/* --- VENDAS (AGORA FUNCIONAL) --- */}
+            {/* --- ABA PEDIDOS (DETALHADA) --- */}
+            {abaAtiva === 'pedidos' && (
+              <div className="space-y-4">
+                 <div className="flex justify-between items-center mb-2"><h2 className="text-xl font-bold text-zinc-100">Lista Detalhada</h2></div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{pedidosPendentes.map(p => (<div key={p.id} className="bg-zinc-900 rounded-2xl shadow-sm border border-zinc-800 overflow-hidden hover:border-zinc-700 transition-all duration-300 flex flex-col"><div className={`h-1 w-full ${p.status === 'Saiu para Entrega' ? 'bg-orange-500' : 'bg-red-500'}`}></div><div className="p-5 flex-1 flex flex-col gap-3"><div className="flex justify-between items-center"><span className="font-black text-zinc-500 text-xs tracking-wider">#{p.id}</span><span className="text-xs font-bold text-zinc-500 flex items-center gap-1"><Clock size={12}/> {p.hora}</span></div><div><Badge status={p.status}/></div><div><div className="font-bold text-zinc-100 text-lg leading-tight">{p.cliente?.nome}</div><div className="text-xs text-zinc-400 mt-1 flex items-start gap-1"><MapPin size={12} className="mt-0.5 shrink-0 text-red-500"/><span className="line-clamp-2">{p.cliente?.endereco}</span></div></div><div className="bg-zinc-950 rounded-lg p-3 text-sm border border-zinc-800 mt-1 flex-1 text-zinc-300">{(p.itens||[]).map((i, idx) => (<div key={idx} className="flex justify-between items-start border-b border-zinc-800 last:border-0 pb-1 last:pb-0 mb-1 last:mb-0"><span className="font-bold text-red-500 w-6">{i.qtd}x</span><span className="text-zinc-300 flex-1 leading-tight">{i.nome}</span></div>))}{p.observacoes && <div className="mt-2 pt-2 border-t border-zinc-800 text-[10px] text-orange-500 font-bold uppercase">Obs: {p.observacoes}</div>}</div></div><div className="p-4 bg-zinc-950/50 border-t border-zinc-800 flex justify-between items-center"><div className="flex flex-col"><span className="text-[10px] font-bold text-zinc-500 uppercase">Total</span><span className="font-black text-xl text-zinc-100">{formatarMoeda(p.total)}</span></div><div className="flex gap-2"><button onClick={() => imprimir(p)} className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 text-zinc-300 rounded-lg text-xs font-bold hover:bg-zinc-700"><Printer size={14}/></button><button onClick={() => editarPedido(p)} className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 text-zinc-300 rounded-lg text-xs font-bold hover:bg-zinc-700">Editar</button><button onClick={() => cancelarPedido(p.id)} className="px-3 py-1.5 bg-red-900/20 border border-red-900/40 text-red-400 rounded-lg text-xs font-bold hover:bg-red-900/30">Cancelar</button></div></div></div>))}</div>
+              </div>
+            )}
+
+            {/* --- ABA VENDAS (CAIXA) --- */}
             {abaAtiva === 'vendas' && (
-               <>
-                 <div className="grid grid-cols-3 gap-4">
-                    <Card className="p-4 border-l-4 border-green-500"><span className="text-xs font-bold text-green-600 uppercase">Faturamento</span><h3 className="text-2xl font-black dark:text-white">{formatarMoeda(kpis.total)}</h3></Card>
-                    <Card className="p-4 border-l-4 border-yellow-500"><span className="text-xs font-bold text-yellow-600 uppercase">Pedidos</span><h3 className="text-2xl font-black dark:text-white">{kpis.qtd}</h3></Card>
-                    <Card className="p-4 border-l-4 border-red-500"><span className="text-xs font-bold text-red-600 uppercase">Ticket Médio</span><h3 className="text-2xl font-black dark:text-white">{formatarMoeda(kpis.ticket)}</h3></Card>
+              <div className="space-y-6 animate-fade-in">
+                 <div className="grid grid-cols-3 gap-2">
+                    <Card className="p-3 bg-zinc-900 border-zinc-800"><span className="text-xs font-bold text-green-500">Faturamento</span><h3 className="text-xl font-black text-white">{formatarMoeda(kpis.total)}</h3></Card>
+                    <Card className="p-3 bg-zinc-900 border-zinc-800"><span className="text-xs font-bold text-yellow-500">Pedidos</span><h3 className="text-xl font-black text-white">{kpis.qtd}</h3></Card>
+                    <Card className="p-3 bg-zinc-900 border-zinc-800"><span className="text-xs font-bold text-red-500">Ticket Médio</span><h3 className="text-xl font-black text-white">{formatarMoeda(kpis.ticket)}</h3></Card>
                  </div>
-                 <div className="flex gap-2 items-center bg-white dark:bg-slate-800 p-2 rounded-lg"><Calendar size={20} className="dark:text-white"/><input type="date" value={filtroData} onChange={e => setFiltroData(e.target.value)} className="bg-transparent dark:text-white font-bold"/></div>
-                 <Card className="overflow-x-auto"><table className="w-full text-left text-sm dark:text-gray-300"><thead className="bg-gray-100 dark:bg-slate-700"><tr><th className="p-3">#</th><th className="p-3">Cliente</th><th className="p-3">Status</th><th className="p-3 text-right">Valor</th></tr></thead>
-                 <tbody className="divide-y dark:divide-slate-700">{pedidosFiltrados.map(p => <tr key={p.id}><td className="p-3 font-bold">#{p.id?.toString().slice(-4)}</td><td className="p-3">{p.cliente.nome}</td><td className="p-3"><Badge status={p.status}/></td><td className="p-3 text-right font-bold">{formatarMoeda(p.total)}</td></tr>)}</tbody></table></Card>
-               </>
+                 <div className="p-3 bg-zinc-900 rounded-lg border border-zinc-800"><input type="date" value={filtroData} onChange={e => setFiltroData(e.target.value)} className="bg-zinc-950 text-white border border-zinc-700 rounded p-2 w-full"/></div>
+                 <Card className="p-0 bg-zinc-900"><table className="w-full text-xs text-left text-zinc-300"><thead className="bg-zinc-950 text-zinc-500"><tr><th className="p-2">#</th><th className="p-2">Nome</th><th className="p-2 text-right">R$</th></tr></thead><tbody className="divide-y divide-zinc-800">{pedidos.filter(p => (p.status === 'Concluido' || p.status === 'Cancelado') && p.data === filtroData).map(p => <tr key={p.id}><td className="p-2">#{p.id}</td><td className="p-2">{p.cliente?.nome}</td><td className="p-2 text-right text-emerald-400">{formatarMoeda(p.total)}</td></tr>)}</tbody></table></Card>
+              </div>
             )}
 
-            {/* --- PRODUTOS --- */}
+            {/* --- ABA CARDÁPIO --- */}
             {abaAtiva === 'produtos' && (
-                <>
-                  <div className="flex justify-between items-center"><h2 className="text-xl font-bold dark:text-white">Cardápio</h2><button onClick={abrirNovoProduto} className="bg-black dark:bg-white dark:text-black text-white px-4 py-2 rounded-lg font-bold flex gap-2"><Plus size={16}/> Novo Item</button></div>
-                  <div className="flex gap-2 overflow-x-auto pb-2">{['Lanches','Bebidas','Combos','Adicionais'].map(c => <button key={c} onClick={() => setFiltroCardapio(c)} className={`px-4 py-1 rounded-full text-xs font-bold border ${filtroCardapio === c ? 'bg-red-600 text-white border-red-600' : 'bg-white dark:bg-slate-800 dark:text-white border-gray-300'}`}>{c}</button>)}</div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{produtos.filter(p => {if(filtroCardapio==='Adicionais') return p.tipo==='adicional'; return p.categoria===filtroCardapio && p.tipo!=='adicional'}).map(p => (
-                      <div key={p.id} className="bg-white dark:bg-slate-800 p-3 rounded-lg border dark:border-slate-700 flex justify-between items-center"><div><div className="font-bold dark:text-white">{p.nome}</div><div className="text-xs text-gray-500">{formatarMoeda(p.preco)} • Est: {p.estoque}</div></div><div className="flex gap-2"><button onClick={() => {setFormProduto(p); setModalProdutoAberto(true)}}><Pencil size={16} className="text-gray-500"/></button><button onClick={() => excluirProduto(p.id)}><Trash2 size={16} className="text-red-500"/></button></div></div>
-                  ))}</div>
-                </>
+               <div className="space-y-4">
+                  <div className="flex justify-between items-center"><h2 className="font-bold text-white">Cardápio</h2><button onClick={abrirNovoProduto} className="bg-white text-black px-3 py-1 rounded text-xs font-bold hover:bg-gray-200">Add</button></div>
+                  <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">{['Lanches','Bebidas','Combos','Adicionais'].map(c => <button key={c} onClick={() => setFiltroCardapio(c)} className={`px-3 py-1 rounded-full text-xs border ${filtroCardapio===c?'bg-red-600 text-white border-red-600':'bg-zinc-900 text-zinc-400 border-zinc-700 hover:bg-zinc-800'}`}>{c}</button>)}</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">{produtos.filter(p => {if(filtroCardapio==='Adicionais') return p.tipo==='adicional'; return p.categoria===filtroCardapio && p.tipo!=='adicional'}).map(p => <div key={p.id} className="bg-zinc-900 p-3 rounded-lg border border-zinc-800 flex justify-between items-center"><div><div className="font-bold text-sm text-zinc-200">{p.nome}</div><div className="text-xs text-zinc-500">{formatarMoeda(p.preco)} • Est: {p.estoque}</div></div><div className="flex gap-2"><button onClick={() => {setFormProduto(p); setModalProdutoAberto(true)}} className="p-2 bg-zinc-800 text-zinc-300 rounded"><Pencil size={14}/></button><button onClick={() => excluirProduto(p.id)} className="p-2 bg-red-900/30 text-red-400 rounded"><Trash2 size={14}/></button></div></div>)}</div>
+               </div>
             )}
 
-            {/* --- CLIENTES --- */}
+            {/* --- ABA CLIENTES --- */}
             {abaAtiva === 'clientes' && (
-                <>
-                    <div className="flex justify-between items-center"><h2 className="text-xl font-bold dark:text-white">Clientes</h2><button onClick={abrirNovoCliente} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold flex gap-2"><UserPlus size={16}/> Novo Cliente</button></div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{clientes.map(c => (
-                        <div key={c.id} className="bg-white dark:bg-slate-800 p-3 rounded-lg border dark:border-slate-700 flex justify-between items-center"><div><div className="font-bold dark:text-white">{c.nome}</div><div className="text-xs text-gray-500">{c.telefone} • {c.endereco}</div></div><div className="flex gap-2"><button onClick={() => {setFormCliente(c); setModalClienteAberto(true)}}><Pencil size={16} className="text-gray-500"/></button><button onClick={() => excluirCliente(c.id)}><Trash2 size={16} className="text-red-500"/></button></div></div>
-                    ))}</div>
-                </>
-            )}
-            
-            {/* --- CONFIGURAÇÕES & MONTAGEM --- */}
-            {abaAtiva === 'montagem' && (
                 <div className="space-y-4">
-                    <div className="flex justify-between items-center"><h2 className="text-xl font-bold dark:text-white text-indigo-600"><Layers/> Configurar Montagem</h2></div>
-                    <Card className="p-4 bg-indigo-50 dark:bg-slate-700/50"><div className="flex gap-2"><select className="p-2 rounded border text-sm" value={novoItemMontagem.categoria} onChange={e => setNovoItemMontagem({...novoItemMontagem, categoria: e.target.value})}><option value="paes">Pães</option><option value="queijos">Queijos</option><option value="salsichas">Salsichas</option><option value="molhos">Molhos</option><option value="adicionais">Adicionais</option></select><input className="flex-1 p-2 rounded border text-sm" placeholder="Nome" value={novoItemMontagem.nome} onChange={e => setNovoItemMontagem({...novoItemMontagem, nome: e.target.value})}/><input className="w-20 p-2 rounded border text-sm" placeholder="R$" type="number" value={novoItemMontagem.valor} onChange={e => setNovoItemMontagem({...novoItemMontagem, valor: e.target.value})}/><button onClick={() => {if(novoItemMontagem.nome){if(supabase){supabase.from('montagem_itens').insert([{categoria:novoItemMontagem.categoria, nome:novoItemMontagem.nome, valor:parseFloat(novoItemMontagem.valor||0)}]).then(fetchDados)} else {alert("Sem Supabase");} setNovoItemMontagem({...novoItemMontagem, nome:''})}}} className="bg-indigo-600 text-white px-4 rounded">Add</button></div></Card>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{['paes', 'queijos', 'salsichas', 'molhos', 'adicionais'].map(cat => (<Card key={cat} className="p-4"><h4 className="font-bold text-gray-500 uppercase text-xs mb-2 border-b pb-1">{cat}</h4><div className="space-y-1">{configMontagem[cat].map(i => <div key={i.id} className="flex justify-between text-sm dark:text-white"><span>{i.nome}</span><span>{i.valor>0?`+${formatarMoeda(i.valor)}`:''} <button onClick={async () => {if(supabase) {await supabase.from('montagem_itens').delete().eq('id', i.id); fetchDados();}}} className="text-red-500 ml-2">x</button></span></div>)}</div></Card>))}</div>
+                    <div className="flex justify-between items-center"><h2 className="font-bold text-white">Clientes</h2><button onClick={abrirNovoCliente} className="bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-blue-500">Add</button></div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">{clientes.map(c => <div key={c.id} className="bg-zinc-900 p-3 rounded-lg border border-zinc-800 flex justify-between items-center"><div><div className="font-bold text-sm text-zinc-200">{c.nome}</div><div className="text-xs text-zinc-500">{c.telefone}</div></div><div className="flex gap-2"><button onClick={() => {setFormCliente(c); setModalClienteAberto(true)}} className="p-2 bg-zinc-800 text-zinc-300 rounded"><Pencil size={14}/></button><button onClick={() => excluirCliente(c.id)} className="p-2 bg-red-900/30 text-red-400 rounded"><Trash2 size={14}/></button></div></div>)}</div>
                 </div>
             )}
 
-            {/* --- PEDIDOS (LISTA) --- */}
-            {abaAtiva === 'pedidos' && <div className="space-y-4"><h2 className="text-xl font-bold dark:text-white">Todos os Pedidos</h2><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">{pedidos.map(p => <div key={p.id} className="bg-white dark:bg-slate-800 p-4 rounded-xl border dark:border-slate-700"><div className="flex justify-between font-bold dark:text-white"><span>#{p.id}</span><span className="text-red-600">{formatarMoeda(p.total)}</span></div><div className="text-sm text-gray-500">{p.cliente.nome}</div><div className="text-xs text-gray-400">{p.data} - {p.hora}</div><div className="mt-2 pt-2 border-t dark:border-slate-700 flex gap-2"><button onClick={() => {setFormPedido({...p, itens: p.itens||[]}); setModalPedidoAberto(true)}} className="bg-gray-100 px-3 py-1 rounded text-xs">Ver</button></div></div>)}</div></div>}
+            {/* --- ABA MONTAGEM --- */}
+            {abaAtiva === 'montagem' && (
+               <div className="space-y-6 animate-fade-in">
+                  <div className="flex justify-between items-center mb-4"><h2 className="text-2xl font-extrabold text-indigo-400 italic flex items-center gap-2"><Layers/> Itens de Montagem</h2></div>
+                  <Card className="p-4 bg-indigo-900/20 border-indigo-900/40">
+                     <h4 className="font-bold text-indigo-300 text-sm mb-2">Cadastrar Opção</h4>
+                     <div className="flex gap-2 mb-2">
+                        <select className="border border-indigo-900/40 bg-zinc-900 text-zinc-200 rounded p-2 text-xs w-32" value={novoItemMontagem.categoria} onChange={e => setNovoItemMontagem({...novoItemMontagem, categoria: e.target.value})}><option value="paes">Pães</option><option value="queijos">Queijos</option><option value="salsichas">Salsichas</option><option value="molhos">Molhos</option><option value="adicionais">Adicionais</option></select>
+                        <input placeholder="Nome" className="flex-1 border border-indigo-900/40 bg-zinc-900 text-zinc-200 rounded p-2 text-xs" value={novoItemMontagem.nome} onChange={e => setNovoItemMontagem({...novoItemMontagem, nome: e.target.value})}/>
+                        <input placeholder="R$" type="number" className="w-20 border border-indigo-900/40 bg-zinc-900 text-zinc-200 rounded p-2 text-xs" value={novoItemMontagem.valor} onChange={e => setNovoItemMontagem({...novoItemMontagem, valor: e.target.value})}/>
+                        <button onClick={adicionarItemConfig} className="bg-indigo-600 text-white px-3 rounded text-xs font-bold hover:bg-indigo-500">Salvar</button>
+                     </div>
+                  </Card>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{[{key:'paes',t:'Pães'},{key:'queijos',t:'Queijos'},{key:'salsichas',t:'Salsichas'},{key:'molhos',t:'Molhos'},{key:'adicionais',t:'Adicionais'}].map(g=><Card key={g.key} className="p-4 bg-zinc-900 border-zinc-800"><h5 className="font-bold text-zinc-400 text-xs uppercase mb-2 border-b border-zinc-800 pb-1">{g.t}</h5><div className="space-y-1">{configMontagem[g.key].map(i=><div key={i.id} className="flex justify-between text-xs bg-zinc-950 p-2 rounded text-zinc-300 border border-zinc-800"><span>{i.nome}</span><span>{i.valor>0?`+${formatarMoeda(i.valor)}`:'Grátis'} <button onClick={()=>removerItemConfig(g.key,i.id)} className="text-red-500 ml-2 font-bold hover:text-red-400">x</button></span></div>)}</div></Card>)}</div>
+               </div>
+            )}
 
+            {/* --- ABA CONFIG --- */}
+            {abaAtiva === 'config' && (
+                <div className="space-y-6">
+                    <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-extrabold text-zinc-100 italic flex items-center gap-2"><Settings className="text-zinc-500"/> Configurações</h2></div>
+                    <Card className="p-6 border-zinc-800 bg-zinc-900">
+                        <h3 className="font-bold text-lg mb-4 text-zinc-100 flex items-center gap-2"><ImageIcon size={20}/> Personalização Visual</h3>
+                        <div className="mb-4"><label className="text-sm font-bold text-zinc-400 block mb-1">URL da Sua Logo (Imagem)</label><input placeholder="https://seusite.com/logo.png" className="w-full border border-zinc-700 bg-zinc-950 text-zinc-200 rounded-lg p-2 text-sm" value={logoUrl} onChange={e => setLogoUrl(e.target.value)}/></div>
+                    </Card>
+                    <Card className="p-6 border-zinc-800 bg-zinc-900"><h3 className="font-bold text-lg mb-4 text-zinc-100">Taxas de Entrega</h3><form onSubmit={salvarTaxa} className="flex gap-2 mb-6"><input placeholder="Descrição" required className="flex-1 border border-zinc-700 bg-zinc-950 text-zinc-200 rounded-lg p-2 text-sm" value={novaTaxa.nome} onChange={e => setNovaTaxa({...novaTaxa, nome: e.target.value})}/><input placeholder="Valor" required type="number" step="0.50" className="w-24 border border-zinc-700 bg-zinc-950 text-zinc-200 rounded-lg p-2 text-sm" value={novaTaxa.valor} onChange={e => setNovaTaxa({...novaTaxa, valor: e.target.value})}/><button type="submit" className="bg-green-600 text-white px-4 rounded-lg font-bold hover:bg-green-500"><Plus/></button></form><div className="space-y-2">{taxasFrete.map(t => (<div key={t.id} className="flex justify-between items-center bg-zinc-950 p-3 rounded-lg border border-zinc-800"><span className="text-sm text-zinc-300">{t.nome}</span><div className="flex items-center gap-3"><span className="font-bold text-emerald-400">{formatarMoeda(t.valor)}</span><button onClick={() => excluirTaxa(t.id)} className="text-red-400 hover:text-red-300"><Trash2 size={16}/></button></div></div>))}</div></Card>
+                </div>
+            )}
+
+        </div>
+
+        {/* BOTTOM BAR MOBILE */}
+        <div className="md:hidden fixed bottom-0 left-0 w-full bg-zinc-900/95 backdrop-blur-md border-t border-zinc-800 flex justify-around p-2 z-20 pb-safe">
+           <button onClick={() => setAbaAtiva('dashboard')} className={`flex flex-col items-center p-2 rounded-xl transition-colors ${abaAtiva === 'dashboard' ? 'text-red-500 bg-red-500/10' : 'text-zinc-500'}`}><Home size={20}/><span className="text-[10px] font-bold">Início</span></button>
+           <button onClick={() => setAbaAtiva('pedidos')} className={`flex flex-col items-center p-2 rounded-xl transition-colors ${abaAtiva === 'pedidos' ? 'text-red-500 bg-red-500/10' : 'text-zinc-500'}`}><ClipboardList size={20}/><span className="text-[10px] font-bold">Pedidos</span></button>
+           <button onClick={abrirNovoPedido} className="bg-gradient-to-r from-red-600 to-orange-600 text-white rounded-full p-3 -mt-8 shadow-lg shadow-red-900/50 border-4 border-zinc-900 active:scale-95 transition-transform"><Plus size={32} strokeWidth={3}/></button>
+           <button onClick={() => setAbaAtiva('vendas')} className={`flex flex-col items-center p-2 rounded-xl transition-colors ${abaAtiva === 'vendas' ? 'text-red-500 bg-red-500/10' : 'text-zinc-500'}`}><DollarSign size={20}/><span className="text-[10px] font-bold">Caixa</span></button>
+           <button onClick={() => setAbaAtiva('produtos')} className={`flex flex-col items-center p-2 rounded-xl transition-colors ${abaAtiva === 'produtos' ? 'text-red-500 bg-red-500/10' : 'text-zinc-500'}`}><ChefHat size={20}/><span className="text-[10px] font-bold">Menu</span></button>
         </div>
       </main>
 
-      {/* --- MODAIS GERAIS (PEDIDO, PRODUTO, CLIENTE, MONTAGEM) --- */}
-      {/* Mantendo a mesma estrutura dos modais das versões anteriores para economizar caracteres na resposta, mas integrados com as funções de salvar acima */}
-      {modalPedidoAberto && (
-          <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-              <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-2xl h-[90vh] flex flex-col overflow-hidden">
-                  <div className="p-4 border-b dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800"><h3 className="font-bold text-lg dark:text-white">Pedido</h3><button onClick={() => setModalPedidoAberto(false)}><X/></button></div>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                      {/* Formulario simplificado para caber */}
-                      <div className="grid grid-cols-2 gap-2">
-                          <input placeholder="Nome" className="border p-2 rounded" value={formPedido.nome} onChange={e => setFormPedido({...formPedido, nome: e.target.value})} />
-                          <input placeholder="Telefone" className="border p-2 rounded" value={formPedido.telefone} onChange={e => setFormPedido({...formPedido, telefone: e.target.value})} />
-                          <input placeholder="Endereço" className="col-span-2 border p-2 rounded" value={formPedido.endereco} onChange={e => setFormPedido({...formPedido, endereco: e.target.value})} />
-                      </div>
-                      {/* Lista de Itens */}
-                      <div className="space-y-2">
-                          <h4 className="font-bold text-sm">Itens</h4>
-                          {formPedido.itens.map((item, idx) => (
-                              <div key={idx} className="flex gap-2 items-center border p-2 rounded">
-                                  <input type="number" className="w-12 border p-1 rounded" value={item.qtd} onChange={e => {const n=[...formPedido.itens]; n[idx].qtd=e.target.value; setFormPedido({...formPedido, itens: n})}} />
-                                  {item.produtoId === 999 ? <span className="flex-1 font-bold text-indigo-600">Dog Montado</span> : 
-                                   <select className="flex-1 border p-1 rounded" value={item.produtoId} onChange={e => {const n=[...formPedido.itens]; const p = produtos.find(x=>x.id==e.target.value); n[idx].produtoId=p.id; n[idx].nome=p.nome; n[idx].preco=p.preco; setFormPedido({...formPedido, itens: n})}}>
-                                       <option value="">Selecione...</option>{produtos.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                                   </select>
-                                  }
-                                  <button onClick={() => {const n = formPedido.itens.filter((_, i) => i !== idx); setFormPedido({...formPedido, itens: n})}} className="text-red-500"><Trash2 size={16}/></button>
-                              </div>
-                          ))}
-                          <button onClick={() => setFormPedido({...formPedido, itens: [...formPedido.itens, {produtoId:'', qtd:1, preco:0}]})} className="text-sm text-blue-600 font-bold">+ Adicionar Item</button>
-                      </div>
-                      {/* Pagamento */}
-                      <div className="grid grid-cols-2 gap-2">
-                          <select className="border p-2 rounded" value={formPedido.pagamento} onChange={e => setFormPedido({...formPedido, pagamento: e.target.value})}><option>Dinheiro</option><option>PIX</option><option>Cartão</option></select>
-                          <input type="number" placeholder="Troco para" className="border p-2 rounded" value={formPedido.trocoPara} onChange={e => setFormPedido({...formPedido, trocoPara: e.target.value})} />
-                          <input type="number" placeholder="Taxa Entrega" className="border p-2 rounded" value={formPedido.taxaEntrega} onChange={e => setFormPedido({...formPedido, taxaEntrega: e.target.value})} />
-                          <div className="font-black text-xl text-right pt-2">{formatarMoeda(calcularTotalPedido(formPedido.itens, formPedido.taxaEntrega, formPedido.desconto))}</div>
-                      </div>
-                  </div>
-                  <div className="p-4 border-t dark:border-slate-700"><button onClick={salvarPedido} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold">SALVAR PEDIDO</button></div>
-              </div>
-          </div>
-      )}
+      {/* MODAIS (IGUAIS AO ANTERIOR, SÓ INCLUINDO PARA FUNCIONAR 100%) */}
+      {modalProdutoAberto && (<div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"><div className="bg-zinc-900 w-full max-w-md rounded-2xl shadow-2xl border border-zinc-800 p-6"><h3 className="font-bold text-xl mb-4 text-white">{formProduto.id ? 'Editar Produto' : 'Novo Produto'}</h3><form onSubmit={salvarProduto} className="space-y-4"><div><label className="text-xs font-bold uppercase text-zinc-500">Nome</label><input required className="w-full border border-zinc-700 bg-zinc-950 text-white rounded-lg p-2" value={formProduto.nome} onChange={e => setFormProduto({...formProduto, nome: e.target.value})}/></div><div><label className="text-xs font-bold uppercase text-zinc-500">Descrição</label><textarea className="w-full border border-zinc-700 bg-zinc-950 text-white rounded-lg p-2 h-16" value={formProduto.descricao} onChange={e => setFormProduto({...formProduto, descricao: e.target.value})}/></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold uppercase text-zinc-500">Preço</label><input required type="number" step="0.50" className="w-full border border-zinc-700 bg-zinc-950 text-white rounded-lg p-2" value={formProduto.preco} onChange={e => setFormProduto({...formProduto, preco: e.target.value})}/></div><div className="flex-1"><label className="text-xs font-bold uppercase text-zinc-500">Estoque</label><input type="number" className="w-full border border-zinc-700 bg-zinc-950 text-white rounded-lg p-2" value={formProduto.estoque} onChange={e => setFormProduto({...formProduto, estoque: e.target.value})}/></div></div><div><label className="text-xs font-bold uppercase text-zinc-500">Categoria</label><select className="w-full border border-zinc-700 bg-zinc-950 text-white rounded-lg p-2" value={formProduto.categoria} onChange={e => setFormProduto({...formProduto, categoria: e.target.value})}><option value="Lanches">Lanches</option><option value="Bebidas">Bebidas</option><option value="Combos">Combos</option><option value="Adicionais">Adicionais</option></select></div>{formProduto.categoria !== 'Adicionais' && formProduto.categoria !== 'Bebidas' && <div><label className="text-xs font-bold uppercase text-zinc-500">Opções</label><textarea className="w-full border border-zinc-700 bg-zinc-950 text-white rounded-lg p-2 h-20 text-sm" value={formProduto.opcoes} onChange={e => setFormProduto({...formProduto, opcoes: e.target.value})}/></div>}<div className="flex justify-end gap-2 mt-4 pt-4 border-t border-zinc-800"><button type="button" onClick={() => setModalProdutoAberto(false)} className="px-4 py-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg">Cancelar</button><button type="submit" className="px-6 py-2 bg-white text-black font-bold rounded-lg hover:bg-zinc-200">Salvar</button></div></form></div></div>)}
+      {modalClienteAberto && (<div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"><div className="bg-zinc-900 w-full max-w-md rounded-2xl shadow-2xl border border-zinc-800 p-6"><h3 className="font-bold text-xl mb-4 text-blue-400 flex items-center gap-2"><UserPlus size={24}/> {formCliente.id ? 'Editar Cliente' : 'Novo Cliente'}</h3><form onSubmit={salvarCliente} className="space-y-4"><div><label className="text-xs font-bold uppercase text-zinc-500">Nome</label><input required className="w-full border border-zinc-700 bg-zinc-950 text-white rounded-lg p-2" value={formCliente.nome} onChange={e => setFormCliente({...formCliente, nome: e.target.value})}/></div><div><label className="text-xs font-bold uppercase text-zinc-500">Telefone</label><input className="w-full border border-zinc-700 bg-zinc-950 text-white rounded-lg p-2" value={formCliente.telefone} onChange={e => setFormCliente({...formCliente, telefone: e.target.value})}/></div><div><label className="text-xs font-bold uppercase text-zinc-500">Endereço</label><input required className="w-full border border-zinc-700 bg-zinc-950 text-white rounded-lg p-2" value={formCliente.endereco} onChange={e => setFormCliente({...formCliente, endereco: e.target.value})}/></div><div className="flex justify-end gap-2 mt-4 pt-4 border-t border-zinc-800"><button type="button" onClick={() => setModalClienteAberto(false)} className="px-4 py-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg">Cancelar</button><button type="submit" className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-500">Salvar</button></div></form></div></div>)}
       
-      {modalMonteDogAberto && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-           <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl h-[85vh] flex flex-col overflow-hidden">
-               <div className="bg-indigo-600 p-4 text-white font-black flex justify-between"><span>MONTE SEU DOG</span><button onClick={() => setModalMonteDogAberto(false)}><X/></button></div>
-               <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                   <div><h5 className="font-bold text-indigo-600 text-sm mb-2">1. PÃO</h5><div className="flex flex-wrap gap-2">{configMontagem.paes.map(p => <button key={p.id} onClick={() => setMontagem({...montagem, paoId: p.id})} className={`px-3 py-2 border rounded-lg text-sm ${montagem.paoId === p.id ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700'}`}>{p.nome}</button>)}</div></div>
-                   <div><h5 className="font-bold text-indigo-600 text-sm mb-2">2. SALSICHA</h5><div className="flex flex-wrap gap-2">{configMontagem.salsichas.map(p => <button key={p.id} onClick={() => setMontagem({...montagem, salsichaId: p.id})} className={`px-3 py-2 border rounded-lg text-sm ${montagem.salsichaId === p.id ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700'}`}>{p.nome}</button>)}</div></div>
-                   <div><h5 className="font-bold text-indigo-600 text-sm mb-2">3. INGREDIENTES</h5><div className="grid grid-cols-2 gap-2">{configMontagem.queijos.concat(configMontagem.molhos).map(p => <button key={p.id} onClick={() => toggleMultiplo(p.categoria === 'queijos' ? 'queijoIds' : 'molhoIds', p.id)} className={`px-2 py-2 border rounded text-xs text-left ${montagem.queijoIds.includes(p.id) || montagem.molhoIds.includes(p.id) ? 'bg-green-100 border-green-500' : 'bg-white'}`}>{p.nome}</button>)}</div></div>
-                   <div><h5 className="font-bold text-indigo-600 text-sm mb-2">4. EXTRAS (+R$)</h5><div className="flex flex-wrap gap-2">{configMontagem.adicionais.map(p => <button key={p.id} onClick={() => toggleMultiplo('adicionalIds', p.id)} className={`px-3 py-2 border rounded-lg text-xs ${montagem.adicionalIds.includes(p.id) ? 'bg-yellow-100 border-yellow-500' : 'bg-white'}`}>{p.nome} (+{formatarMoeda(p.valor)})</button>)}</div></div>
-               </div>
-               <div className="p-4 border-t"><button onClick={concluirMontagem} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold">CONCLUIR MONTAGEM</button></div>
-           </div>
-        </div>
-      )}
-      
-      {/* Modais de Produto e Cliente seguem a mesma lógica simples (Omitidos para brevidade, mas funcionais se copiados das versões anteriores e adaptados o onSubmit) */}
+      {modalMonteDogAberto && (<div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4"><div className="bg-zinc-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-zinc-800"><div className="bg-indigo-700 p-4 text-white font-black text-xl flex justify-between items-center shadow-sm"><div className="flex items-center gap-2"><Edit3/> MONTE SEU DOG</div><button onClick={() => setModalMonteDogAberto(false)} className="bg-white/10 p-1 rounded hover:bg-white/20"><X/></button></div><div className="p-6 overflow-y-auto space-y-6 bg-zinc-950 flex-1"><div><h4 className="font-bold text-indigo-400 mb-3 flex items-center gap-2 uppercase text-sm tracking-wider border-b border-zinc-800 pb-2">1. Escolha o Pão</h4><div className="space-y-2">{configMontagem.paes.map(pao => (<label key={pao.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${montagem.paoId == pao.id ? 'border-indigo-500 bg-indigo-900/20' : 'border-zinc-800 bg-zinc-900 hover:border-zinc-700'}`}><input type="radio" name="pao" className="accent-indigo-500 w-5 h-5" checked={montagem.paoId == pao.id} onChange={() => setMontagem({...montagem, paoId: pao.id})}/><span className="font-bold text-zinc-200">{pao.nome} {pao.valor > 0 && <span className="text-indigo-400 text-xs ml-1">(+{formatarMoeda(pao.valor)})</span>}</span></label>))}</div></div><div><h4 className="font-bold text-indigo-400 mb-3 flex items-center gap-2 uppercase text-sm tracking-wider border-b border-zinc-800 pb-2">2. Queijo</h4><div className="grid grid-cols-2 gap-2">{configMontagem.queijos.map(item => (<label key={item.id} className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer text-sm ${montagem.queijoIds.includes(item.id) ? 'bg-emerald-900/20 border-emerald-600 text-emerald-300' : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'}`}><input type="checkbox" className="accent-emerald-500" checked={montagem.queijoIds.includes(item.id)} onChange={() => toggleMultiplo('queijoIds', item.id)}/><span className="flex-1 font-medium">{item.nome}</span>{item.valor > 0 && <span className="font-bold text-emerald-500">+{item.valor}</span>}</label>))}</div></div><div><h4 className="font-bold text-indigo-400 mb-3 flex items-center gap-2 uppercase text-sm tracking-wider border-b border-zinc-800 pb-2">3. Salsicha</h4><div className="space-y-2">{configMontagem.salsichas.map(sal => (<label key={sal.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${montagem.salsichaId == sal.id ? 'border-indigo-500 bg-indigo-900/20' : 'border-zinc-800 bg-zinc-900 hover:border-zinc-700'}`}><input type="radio" name="salsicha" className="accent-indigo-500 w-5 h-5" checked={montagem.salsichaId == sal.id} onChange={() => setMontagem({...montagem, salsichaId: sal.id})}/><span className="font-bold text-zinc-200 text-sm">{sal.nome} {sal.valor > 0 && <span className="text-indigo-400 text-xs">(+{formatarMoeda(sal.valor)})</span>}</span></label>))}</div></div><div><h4 className="font-bold text-indigo-400 mb-3 flex items-center gap-2 uppercase text-sm tracking-wider border-b border-zinc-800 pb-2">4. Molhos</h4><div className="flex flex-wrap gap-2">{configMontagem.molhos.map(item => (<label key={item.id} className={`flex items-center gap-2 px-4 py-2 rounded-full border cursor-pointer text-xs font-bold ${montagem.molhoIds.includes(item.id) ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}><input type="checkbox" className="hidden" checked={montagem.molhoIds.includes(item.id)} onChange={() => toggleMultiplo('molhoIds', item.id)}/>{item.nome}</label>))}</div></div><div><h4 className="font-bold text-indigo-400 mb-3 flex items-center gap-2 uppercase text-sm tracking-wider border-b border-zinc-800 pb-2">5. Extras</h4><div className="space-y-2">{configMontagem.adicionais.map(extra => (<label key={extra.id} className={`flex justify-between items-center p-3 rounded-xl border cursor-pointer transition-all ${montagem.adicionalIds.includes(extra.id) ? 'border-yellow-500 bg-yellow-900/20' : 'border-zinc-800 bg-zinc-900 hover:border-zinc-700'}`}><div className="flex items-center gap-2"><input type="checkbox" className="accent-yellow-500 w-5 h-5" checked={montagem.adicionalIds.includes(extra.id)} onChange={() => toggleMultiplo('adicionalIds', extra.id)}/><span className={`font-bold text-sm ${montagem.adicionalIds.includes(extra.id) ? 'text-yellow-200' : 'text-zinc-400'}`}>{extra.nome}</span></div><span className="font-bold text-sm text-yellow-500">+ {formatarMoeda(extra.valor)}</span></label>))}</div></div></div><div className="p-4 bg-zinc-900 border-t border-zinc-800"><button onClick={concluirMontagem} className="w-full bg-gradient-to-r from-indigo-600 to-purple-700 text-white py-4 rounded-xl font-black text-lg shadow-lg hover:scale-[1.02] transition-transform border border-indigo-500/50">ADICIONAR AO PEDIDO</button></div></div></div>)}
+
+      {modalPedidoAberto && (<div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4 sm:p-6 animate-fade-in"><div className="bg-zinc-900 w-full max-w-2xl rounded-3xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col border-2 border-zinc-800"><div className="bg-gradient-to-r from-red-700 to-orange-700 text-white p-5 flex justify-between items-center"><h3 className="font-extrabold text-xl flex items-center gap-2 italic">{formPedido.id ? 'Editar Dogão' : 'Novo Pedido'}</h3><button onClick={() => setModalPedidoAberto(false)} className="bg-white/10 p-2 rounded-full hover:bg-white/20"><X size={20}/></button></div><div className="flex-1 overflow-y-auto p-6 bg-zinc-950"><form onSubmit={salvarPedido} className="space-y-6"><Card className="p-5 border-red-900/30 bg-red-950/10"><h4 className="font-bold text-red-400 mb-4 flex items-center gap-2 text-lg"><User size={20} className="text-red-500"/> Cliente</h4><div className="grid grid-cols-1 md:grid-cols-2 gap-4">{!formPedido.id && (<div className="md:col-span-2 bg-red-900/20 p-3 rounded-xl border border-red-900/50"><label className="text-xs font-bold text-red-300 uppercase mb-1 block">Buscar Salvo</label><select className="w-full border border-red-900 bg-zinc-900 text-white rounded-lg p-2.5" onChange={(e) => selecionarClienteNoPedido(e.target.value)} defaultValue=""><option value="">-- Selecione --</option>{clientes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></div>)}<div><label className="text-xs font-bold text-zinc-400 uppercase">Nome</label><input required className="w-full border border-zinc-700 bg-zinc-900 text-white rounded-lg p-2.5 focus:border-red-500" value={formPedido.nome} onChange={e => setFormPedido({...formPedido, nome: e.target.value})}/></div><div><label className="text-xs font-bold text-zinc-400 uppercase">Telefone</label><input className="w-full border border-zinc-700 bg-zinc-900 text-white rounded-lg p-2.5 focus:border-red-500" value={formPedido.telefone} onChange={e => setFormPedido({...formPedido, telefone: e.target.value})}/></div><div className="md:col-span-2"><label className="text-xs font-bold text-zinc-400 uppercase">Endereço</label><input required className="w-full border border-zinc-700 bg-zinc-900 text-white rounded-lg p-2.5 focus:border-red-500" value={formPedido.endereco} onChange={e => setFormPedido({...formPedido, endereco: e.target.value})}/></div></div></Card><Card className="p-5 border-yellow-900/30 bg-yellow-950/10"><h4 className="font-bold text-yellow-500 mb-4 flex items-center gap-2 text-lg"><Utensils size={20}/> Itens</h4><div className="space-y-3">{formPedido.itens.map((item, idx) => { const prodAtual = produtos.find(p => p.id == item.produtoId); const ehBebida = prodAtual?.categoria === 'Bebidas'; const ehAdicional = prodAtual?.categoria === 'Adicionais'; const ehCustom = item.produtoId === 999; 
+                         const opcoesPossiveis = prodAtual?.opcoes ? prodAtual.opcoes.split(',') : [];
+                         return (<div key={idx} className="bg-zinc-900 p-4 rounded-xl border border-zinc-700 shadow-sm relative"><div className="flex gap-2 items-start mb-3"><div className="w-20"><label className="text-[10px] uppercase font-bold text-zinc-500">Qtd</label><input type="number" min="1" className="w-full border border-zinc-700 bg-zinc-950 text-white rounded-lg p-2 text-center font-black text-lg" value={item.qtd} onChange={e => atualizarItem(idx, 'qtd', e.target.value)}/></div><div className="flex-1"><label className="text-[10px] uppercase font-bold text-zinc-500">Produto</label>{ehCustom ? <div className="w-full border border-indigo-900 bg-indigo-900/20 rounded-lg p-2.5 font-bold text-indigo-300">{item.nome} (R$ {item.preco})</div> : <select required className="w-full border border-zinc-700 bg-zinc-950 text-white rounded-lg p-2.5 font-bold" value={item.produtoId} onChange={e => atualizarItem(idx, 'produtoId', e.target.value)}><option value="">Selecione...</option>{Object.keys(produtos.reduce((acc, p) => {if(p.tipo!=='adicional' && p.id!==999) acc[p.categoria]=true; return acc},{})).map(cat => <optgroup key={cat} label={cat}>{produtos.filter(p => p.categoria === cat && p.tipo !== 'adicional' && p.id !== 999).map(p => <option key={p.id} value={p.id}>{p.categoria === 'Lanches' ? '🍔' : p.categoria === 'Bebidas' ? '🥤' : '🍱'} {p.nome}</option>)}</optgroup>)}</select>}</div></div>{item.produtoId && !ehCustom && (<div className="bg-zinc-950 p-3 rounded-lg border border-zinc-800 mt-2 space-y-3">{opcoesPossiveis.length > 0 && (<div><label className="text-xs font-bold text-amber-500 uppercase block mb-1">Opções (Selecione)</label><div className="flex flex-wrap gap-2">{opcoesPossiveis.map(op => { const opClean = op.trim(); const selecionado = (item.opcoesSelecionadas || []).includes(opClean); return (<button type="button" key={opClean} onClick={() => toggleOpcaoItem(idx, opClean)} className={`text-xs px-3 py-1.5 rounded-full border transition-all font-bold ${selecionado ? 'bg-orange-600 text-white border-orange-600' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>{extrairNomeOpcao(opClean)} {extrairValorOpcao(opClean) > 0 ? `(+${formatarMoeda(extrairValorOpcao(opClean))})` : ''}</button>)})}</div></div>)}{!ehBebida && !ehAdicional && (<div><label className="text-xs font-bold text-amber-500 uppercase block mb-1">Adicionais</label><div className="flex flex-wrap gap-2">{produtos.filter(p => p.tipo === 'adicional').map(ad => (<button type="button" key={ad.id} onClick={() => toggleAdicionalItem(idx, ad.id)} className={`text-xs px-3 py-1.5 rounded-full border-2 transition-all font-bold ${item.listaAdicionais?.includes(ad.id) ? 'bg-red-600 border-red-600 text-white' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}>{ad.nome} (+R$ {ad.preco})</button>))}</div></div>)}</div>)}{ehCustom && <div className="text-xs text-zinc-400 mt-2 bg-zinc-950 p-2 rounded border border-zinc-800 whitespace-pre-line">{item.opcaoSelecionada}</div>}{formPedido.itens.length > 1 && <button type="button" onClick={() => {const ni = formPedido.itens.filter((_, i) => i !== idx); setFormPedido({...formPedido, itens: ni})}} className="absolute top-2 right-2 text-zinc-600 hover:text-red-500 p-1"><Trash2 size={16}/></button>}</div>)})} <button type="button" onClick={() => setFormPedido({...formPedido, itens: [...formPedido.itens, { produtoId: '', nome: '', qtd: 1, preco: 0, opcaoSelecionada: '', listaAdicionais: [] }]})} className="w-full py-3 bg-zinc-900 border-2 border-dashed border-zinc-700 text-zinc-400 font-bold rounded-xl hover:bg-zinc-800 hover:text-white flex justify-center items-center gap-2"><Plus size={18}/> ADICIONAR ITEM PADRÃO</button></div></Card><Card className="p-5 border-green-900/30 bg-green-950/10"><div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4"><div className="bg-zinc-900 p-2 rounded-lg border border-zinc-800"><label className="text-[10px] font-bold text-green-500 uppercase mb-1 block">Taxa Entrega</label><div className="flex gap-1"><select className="flex-1 border border-zinc-700 bg-zinc-950 text-white rounded-md py-1 px-2 text-sm" onChange={e => setFormPedido({...formPedido, taxaEntrega: e.target.value})} value={taxasFrete.some(t => t.valor == formPedido.taxaEntrega) ? formPedido.taxaEntrega : ''}><option value="0">Balcão</option>{taxasFrete.map(t => <option key={t.id} value={t.valor}>{t.nome}</option>)}<option value="">Outro</option></select><input type="number" className="w-16 border border-zinc-700 bg-zinc-950 text-white rounded-md py-1 px-1 text-sm font-bold text-right" value={formPedido.taxaEntrega} onChange={e => setFormPedido({...formPedido, taxaEntrega: e.target.value})}/></div></div><div className="bg-zinc-900 p-2 rounded-lg border border-zinc-800"><label className="text-[10px] font-bold text-green-500 uppercase mb-1 block">Pagamento</label><select className="w-full border border-zinc-700 bg-zinc-950 text-white rounded-md py-1 px-2 text-sm font-bold" value={formPedido.pagamento} onChange={e => setFormPedido({...formPedido, pagamento: e.target.value})}><option value="Dinheiro">💵 Dinheiro</option><option value="PIX">✨ PIX</option><option value="Cartão">💳 Cartão</option></select></div></div>{formPedido.pagamento === 'Dinheiro' && (<div className="mb-4 bg-green-900/30 p-3 rounded-xl border border-green-800 flex items-center justify-between"><label className="text-xs font-bold text-green-400">Troco para:</label><input type="number" className="w-20 border-b-2 border-green-600 p-1 font-black text-sm text-green-400 bg-transparent focus:outline-none" placeholder="0,00" value={formPedido.trocoPara} onChange={e => setFormPedido({...formPedido, trocoPara: e.target.value})}/></div>)}<div className="mb-4"><label className="text-xs font-bold text-zinc-400 uppercase ml-1 mb-1 flex items-center gap-1"><Percent size={12}/> Desconto (%)</label><input type="number" className="w-full border border-zinc-700 bg-zinc-950 text-white rounded-lg p-2.5 font-bold" placeholder="0" value={formPedido.desconto} onChange={e => setFormPedido({...formPedido, desconto: e.target.value})}/></div><div><label className="text-xs font-bold text-zinc-400 uppercase ml-1 mb-1 block">Obs. Gerais</label><textarea className="w-full border border-zinc-700 bg-zinc-950 text-white rounded-xl p-3 h-16 text-sm" value={formPedido.observacoes} onChange={e => setFormPedido({...formPedido, observacoes: e.target.value})}/></div></Card></form></div><div className="p-5 bg-zinc-900 border-t-2 border-zinc-800 flex justify-between items-center"><div><span className="text-xs font-bold text-zinc-500 uppercase">Total</span><div className="text-3xl font-black text-white">{formatarMoeda(calcularTotalPedido(formPedido.itens, formPedido.taxaEntrega, formPedido.desconto))}</div></div><button onClick={salvarPedido} className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-black py-4 px-10 rounded-full shadow-lg transition-all text-lg flex items-center gap-2">{formPedido.id ? 'SALVAR' : 'LANÇAR'}</button></div></div></div>)}
     </div>
   );
 }
