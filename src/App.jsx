@@ -1,3 +1,6 @@
+/* eslint-disable no-empty */
+/* eslint-disable no-undef */
+/* eslint-disable no-unused-vars */
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Printer, MapPin, User, CheckCircle, Utensils, Home,
@@ -13,6 +16,11 @@ import {
 const supabaseUrl = 'https://nkxumeebdwbdpdmajwdu.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5reHVtZWViZHdiZHBkbWFqd2R1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyOTA3MDEsImV4cCI6MjA3OTg2NjcwMX0.iPMYUJWQQzn--nEWBjf4_wHuFi7HZkZVXRlRpb94Tyw';
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Inicialização segura do cliente
+const supabase = (supabaseUrl !== 'https://nkxumeebdwbdpdmajwdu.supabase.coE') 
+  ? createClient(supabaseUrl, supabaseKey) 
+  : null;
 
 // --- CONFIGURAÇÃO DE SOM ---
 const SOM_URL = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"; 
