@@ -22,8 +22,13 @@ git push
 
 --------------------
 
-// --- CONFIGURAÇÃO SUPABASE (COLE AQUI) ---
+// --- CONFIGURAÇÃO SUPABASE (COLE SUAS CHAVES AQUI) ---
+// Se não colar as chaves reais aqui, o sistema não salva!
 const supabaseUrl = 'https://nkxumeebdwbdpdmajwdu.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5reHVtZWViZHdiZHBkbWFqd2R1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyOTA3MDEsImV4cCI6MjA3OTg2NjcwMX0.iPMYUJWQQzn--nEWBjf4_wHuFi7HZkZVXRlRpb94Tyw';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Inicialização segura do cliente
+const supabase = (supabaseUrl !== 'https://nkxumeebdwbdpdmajwdu.supabase.coE') 
+  ? createClient(supabaseUrl, supabaseKey) 
+  : null;
