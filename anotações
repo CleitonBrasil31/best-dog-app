@@ -20,3 +20,10 @@ git commit -m "Melhoria tal"
 Publica
 git push
 
+--------------------
+
+// --- CONFIGURAÇÃO SUPABASE (COLE AQUI) ---
+const supabaseUrl = 'https://nkxumeebdwbdpdmajwdu.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5reHVtZWViZHdiZHBkbWFqd2R1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyOTA3MDEsImV4cCI6MjA3OTg2NjcwMX0.iPMYUJWQQzn--nEWBjf4_wHuFi7HZkZVXRlRpb94Tyw';
+const supabase = createClient(supabaseUrl, supabaseKey);
+

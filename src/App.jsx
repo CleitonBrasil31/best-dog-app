@@ -12,10 +12,16 @@ import {
 // --- IMPORTAÇÃO SUPABASE ---
 import { createClient } from '@supabase/supabase-js';
 
-// --- CONFIGURAÇÃO SUPABASE (COLE AQUI) ---
+// --- CONFIGURAÇÃO SUPABASE (COLE SUAS CHAVES AQUI) ---
+// Se não colar as chaves reais aqui, o sistema não salva!
 const supabaseUrl = 'https://nkxumeebdwbdpdmajwdu.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5reHVtZWViZHdiZHBkbWFqd2R1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyOTA3MDEsImV4cCI6MjA3OTg2NjcwMX0.iPMYUJWQQzn--nEWBjf4_wHuFi7HZkZVXRlRpb94Tyw';
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Inicialização segura do cliente
+const supabase = (supabaseUrl !== 'https://nkxumeebdwbdpdmajwdu.supabase.coE') 
+  ? createClient(supabaseUrl, supabaseKey) 
+  : null;
 
 // --- CONFIGURAÇÃO DE SOM ---
 const SOM_URL = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"; 
@@ -41,6 +47,7 @@ const Badge = ({ status }) => {
   );
 };
 
+// --- APP PRINCIPAL ---
 function App() {
   const [abaAtiva, setAbaAtiva] = useState('dashboard'); 
   const [filtroCardapio, setFiltroCardapio] = useState('Lanches');
@@ -55,14 +62,12 @@ function App() {
   const [produtos, setProdutos] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [taxasFrete, setTaxasFrete] = useState([]);
-  const [montagemItens, setMontagemItens] = useState([]); // Dados crus do banco para montagem
+  const [montagemItens, setMontagemItens] = useState([]); 
 
   // --- CONFIGURAÇÕES LOCAIS ---
   const [darkMode, setDarkMode] = useState(() => {
       const salvo = localStorage.getItem('bd_darkmode');
-      if (salvo !== null) return JSON.parse(salvo);
-      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) return true;
-      return false;
+      return salvo ? JSON.parse(salvo) : false;
   });
   const [logoUrl, setLogoUrl] = useState(() => localStorage.getItem('bd_logo_url') || '');
 
@@ -81,6 +86,8 @@ function App() {
 
   // --- FETCH E REALTIME DO SUPABASE ---
   const fetchDados = async () => {
+      if(!supabase) { setLoading(false); return; } // Modo offline/sem chave
+      
       const { data: p } = await supabase.from('produtos').select('*');
       if(p) setProdutos(p);
       
@@ -100,13 +107,11 @@ function App() {
   };
 
   useEffect(() => {
+      if(!supabase) return;
       fetchDados();
 
-      // Inscrever para atualizações em tempo real
       const canal = supabase.channel('mudancas-gerais')
         .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
-            // Estratégia simples: Recarrega tudo se algo mudar. 
-            // Para apps gigantes seria ineficiente, mas para esse caso garante consistência total.
             fetchDados();
             if(payload.table === 'pedidos' && payload.eventType === 'INSERT') tocarSom();
         })
@@ -115,7 +120,7 @@ function App() {
       return () => { supabase.removeChannel(canal); }
   }, []);
 
-  // Organiza os itens de montagem por categoria para uso no modal
+  // Config do Monte seu Dog (Derivado dos dados do banco)
   const configMontagem = useMemo(() => {
       return {
           paes: montagemItens.filter(i => i.categoria === 'paes'),
@@ -138,17 +143,17 @@ function App() {
   });
 
   const [formPedido, setFormPedido] = useState(getFormPedidoInicial());
-  const formProdutoInicial = { id: null, nome: '', descricao: '', preco: '', estoque: '', opcoes: '', tipo: 'principal', categoria: 'Lanches' };
+  const formProdutoInicial = { nome: '', descricao: '', preco: '', estoque: '', opcoes: '', tipo: 'principal', categoria: 'Lanches' };
   const [formProduto, setFormProduto] = useState(formProdutoInicial);
-  const formClienteInicial = { id: null, nome: '', telefone: '', endereco: '', obs: '' };
+  const formClienteInicial = { nome: '', telefone: '', endereco: '', obs: '' };
   const [formCliente, setFormCliente] = useState(formClienteInicial);
   const [montagem, setMontagem] = useState({ paoId: '', salsichaId: '', queijoIds: [], molhoIds: [], adicionalIds: [] });
 
   // --- LÓGICA CRUD (SUPABASE) ---
   
-  // Produtos
   const salvarProduto = async (e) => {
     e.preventDefault();
+    if(!supabase) return alert("Configure as chaves do Supabase no código!");
     let tipo = formProduto.categoria === 'Adicionais' ? 'adicional' : 'principal';
     const dados = { 
         nome: formProduto.nome, 
@@ -165,9 +170,9 @@ function App() {
   };
   const excluirProduto = async (id) => { if(confirm("Excluir?")) await supabase.from('produtos').delete().eq('id', id); };
 
-  // Clientes
   const salvarCliente = async (e) => {
     e.preventDefault();
+    if(!supabase) return alert("Configure as chaves do Supabase!");
     const dados = { nome: formCliente.nome, telefone: formCliente.telefone, endereco: formCliente.endereco, obs: formCliente.obs };
     if(formCliente.id) await supabase.from('clientes').update(dados).eq('id', formCliente.id);
     else await supabase.from('clientes').insert([dados]);
@@ -175,17 +180,18 @@ function App() {
   };
   const excluirCliente = async (id) => { if(confirm("Apagar?")) await supabase.from('clientes').delete().eq('id', id); };
 
-  // Taxas
   const salvarTaxa = async (e) => { 
       e.preventDefault(); 
+      if (!novaTaxa.nome || !novaTaxa.valor) return; 
+      if(!supabase) return;
       await supabase.from('taxas').insert([{ nome: novaTaxa.nome, valor: parseFloat(novaTaxa.valor) }]);
       setNovaTaxa({ nome: '', valor: '' }); 
   };
   const excluirTaxa = async (id) => { if(confirm("Remover?")) await supabase.from('taxas').delete().eq('id', id); };
 
-  // Itens de Montagem
   const adicionarItemConfig = async () => { 
       if (!novoItemMontagem.nome) return; 
+      if(!supabase) return;
       await supabase.from('montagem_itens').insert([{ 
           categoria: novoItemMontagem.categoria, 
           nome: novoItemMontagem.nome, 
@@ -198,6 +204,7 @@ function App() {
   // --- CÁLCULOS ---
   const extrairValorOpcao = (txt) => { if (!txt || !txt.includes('=+')) return 0; return parseFloat(txt.split('=+')[1]) || 0; };
   const extrairNomeOpcao = (txt) => { if (!txt) return ''; return txt.split('=+')[0].trim(); };
+  
   const calcularSubtotalItens = (itens) => { 
     if(!itens || !Array.isArray(itens)) return 0; 
     return itens.reduce((acc, item) => { 
@@ -226,11 +233,7 @@ function App() {
       detalhes.push(`> ${pao.nome} ${pao.valor > 0 ? `(+${formatarMoeda(pao.valor)})` : ''}`);
       detalhes.push(`> ${salsicha.nome} ${salsicha.valor > 0 ? `(+${formatarMoeda(salsicha.valor)})` : ''}`);
 
-      const pushItem = (id, listaOrigem) => {
-          const item = listaOrigem.find(x => x.id == id);
-          if(item){ totalExtras += item.valor; detalhes.push(`+ ${item.nome} ${item.valor > 0 ? `(+${formatarMoeda(item.valor)})` : ''}`); }
-      };
-
+      const pushItem = (id, listaOrigem) => { const item = listaOrigem.find(x => x.id == id); if(item){ totalExtras += item.valor; detalhes.push(`+ ${item.nome} ${item.valor > 0 ? `(+${formatarMoeda(item.valor)})` : ''}`); } };
       montagem.queijoIds.forEach(id => pushItem(id, configMontagem.queijos));
       montagem.molhoIds.forEach(id => pushItem(id, configMontagem.molhos));
       montagem.adicionalIds.forEach(id => pushItem(id, configMontagem.adicionais));
@@ -249,31 +252,40 @@ function App() {
   // --- AÇÕES PEDIDO ---
   const salvarPedido = async (e) => {
     e.preventDefault();
-    const itensValidos = formPedido.itens.filter(i => i.produtoId);
-    if (itensValidos.length === 0) { alert("Adicione itens!"); return; }
-    if (!formPedido.nome) { alert("Nome obrigatório!"); return; }
-    
+    if(!supabase) return alert("ERRO: Configure o Supabase nas primeiras linhas do código!");
+
+    // CORREÇÃO CRÍTICA: Verifica e limpa itens inválidos
+    const itensValidos = (formPedido.itens || []).filter(i => i.produtoId);
+
+    if (itensValidos.length === 0) { alert("⚠️ Adicione itens ao pedido!"); return; }
+    if (!formPedido.nome) { alert("⚠️ Nome obrigatório!"); return; }
+
     const pedidoData = { 
         cliente: { nome: formPedido.nome, endereco: formPedido.endereco, telefone: formPedido.telefone },
         itens: itensValidos,
         total: calcularTotalPedido(itensValidos, formPedido.taxaEntrega, formPedido.desconto),
-        taxa_entrega: parseFloat(formPedido.taxaEntrega),
+        taxa_entrega: parseFloat(formPedido.taxaEntrega || 0), // Garante número
         pagamento: formPedido.pagamento,
-        troco_para: parseFloat(formPedido.trocoPara || 0),
+        troco_para: parseFloat(formPedido.trocoPara || 0), // Garante número
         observacoes: formPedido.observacoes,
-        desconto: parseFloat(formPedido.desconto),
+        desconto: parseFloat(formPedido.desconto || 0), // Garante número
         data: formPedido.id ? formPedido.data : getDataHoje(),
         hora: formPedido.id ? formPedido.hora : new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
         status: formPedido.id ? formPedido.status : "Pendente"
     };
 
-    if (formPedido.id) {
-        await supabase.from('pedidos').update(pedidoData).eq('id', formPedido.id);
-    } else {
-        await supabase.from('pedidos').insert([pedidoData]);
+    try {
+        if (formPedido.id) {
+            await supabase.from('pedidos').update(pedidoData).eq('id', formPedido.id);
+        } else {
+            await supabase.from('pedidos').insert([pedidoData]);
+        }
+        setFormPedido(getFormPedidoInicial());
+        setModalPedidoAberto(false);
+        tocarSom();
+    } catch (err) {
+        alert("Erro ao salvar: " + err.message);
     }
-    setFormPedido(getFormPedidoInicial());
-    setModalPedidoAberto(false);
   };
 
   const avançarStatus = async (id) => {
@@ -281,18 +293,19 @@ function App() {
     if(!pedido) return;
     let novo = '';
     if(pedido.status === 'Pendente') novo = 'Saiu para Entrega';
-    else if (pedido.status === 'Saiu para Entrega') {
-        novo = 'Concluido';
-        // Baixa estoque simplificada (client-side, para produção usar RPC no supabase é melhor)
-        pedido.itens.forEach(async i => {
-            if(i.produtoId === 999) return; // Ignora dog montado
-            const p = produtos.find(x => x.id === i.produtoId);
-            if(p) await supabase.from('produtos').update({ estoque: Math.max(0, p.estoque - i.qtd) }).eq('id', p.id);
-        });
-    }
+    else if (pedido.status === 'Saiu para Entrega') novo = 'Concluido';
+    
     if(novo) {
         await supabase.from('pedidos').update({ status: novo }).eq('id', id);
         if(novo === 'Saiu para Entrega') setTimeout(() => enviarZap({...pedido, status: novo}), 100);
+        // Baixa de estoque simplificada
+        if(novo === 'Concluido' && pedido.itens) {
+            pedido.itens.forEach(async i => {
+                if(i.produtoId === 999) return;
+                const p = produtos.find(x => x.id == i.produtoId);
+                if(p) await supabase.from('produtos').update({ estoque: Math.max(0, p.estoque - i.qtd) }).eq('id', p.id);
+            });
+        }
     }
   };
 
@@ -306,8 +319,7 @@ function App() {
   // UI Helpers
   const abrirNovoPedido = () => { setFormPedido(getFormPedidoInicial()); setModalPedidoAberto(true); };
   const abrirMonteDog = () => { 
-      setFormPedido(getFormPedidoInicial());
-      // Pega primeiro item de cada obrigatório como default se existir
+      setFormPedido(getFormPedidoInicial()); // Limpa pedido antes de começar montagem
       const pId = configMontagem.paes[0]?.id; 
       const sId = configMontagem.salsichas[0]?.id; 
       setMontagem({ paoId: pId, salsichaId: sId, queijoIds: [], molhoIds: [], adicionalIds: [] }); 
@@ -318,7 +330,7 @@ function App() {
   const editarPedido = (p) => { setFormPedido({...p, itens: p.itens || [], clienteId: null, taxaEntrega: p.taxa_entrega, trocoPara: p.troco_para }); setModalPedidoAberto(true); }; 
   const editarCliente = (c) => { setFormCliente(c); setModalClienteAberto(true); };
   const editarProduto = (p) => { setFormProduto(p); setModalProdutoAberto(true); };
-  const selecionarClienteNoPedido = (id) => { const c = clientes.find(x => x.id == id); if(c) setFormPedido({...formPedido, clienteId: c.id, nome: c.nome, endereco: c.endereco, telefone: c.telefone, taxaEntrega: 0}); }; // Taxa 0 pq pode variar
+  const selecionarClienteNoPedido = (id) => { const c = clientes.find(x => x.id == id); if(c) setFormPedido({...formPedido, clienteId: c.id, nome: c.nome, endereco: c.endereco, telefone: c.telefone, taxaEntrega: 0}); };
   const atualizarItem = (idx, f, v) => { const ns = [...formPedido.itens]; ns[idx][f] = v; if(f === 'produtoId') { const p = produtos.find(x => x.id == v); if(p) { ns[idx].nome = p.nome; ns[idx].preco = p.preco; ns[idx].opcoesSelecionadas = []; ns[idx].listaAdicionais = []; } } setFormPedido({...formPedido, itens: ns}); };
   const toggleAdicionalItem = (idx, id) => { const ns = [...formPedido.itens]; const l = ns[idx].listaAdicionais || []; ns[idx].listaAdicionais = l.includes(id) ? l.filter(x => x !== id) : [...l, id]; setFormPedido({...formPedido, itens: ns}); };
   const toggleOpcaoItem = (idx, opcao) => { const ns = [...formPedido.itens]; const atuais = ns[idx].opcoesSelecionadas || []; if (atuais.includes(opcao)) { ns[idx].opcoesSelecionadas = atuais.filter(o => o !== opcao); } else { ns[idx].opcoesSelecionadas = [...atuais, opcao]; } setFormPedido({...formPedido, itens: ns}); };
@@ -333,98 +345,11 @@ function App() {
   };
   const abrirNoMaps = (end) => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(end)}`, '_blank');
   
-  // IMPRESSÃO
+  // IMPRESSÃO (Corrigido para usar os campos certos do DB: taxa_entrega, troco_para)
   const imprimir = (p) => {
     const subtotal = calcularSubtotalItens(p.itens);
     const descontoVal = subtotal * ((p.desconto || 0) / 100);
     const totalFinal = (subtotal - descontoVal) + Number(p.taxa_entrega);
     const troco = p.troco_para ? Number(p.troco_para) - totalFinal : 0;
 
-    const conteudoHtml = `<html><head><meta charset="utf-8"><style>@page{margin:0;size:80mm auto}body{margin:0;padding:5px;font-family:'Courier New',monospace;font-size:12px;color:#000;width:72mm;background:#fff}.header{text-align:center;margin-bottom:10px;border-bottom:2px solid #000;padding-bottom:10px}.title{font-size:20px;font-weight:900;margin:0}.meta{font-size:12px;display:flex;justify-content:space-between;margin-top:5px;font-weight:bold}.section{margin-bottom:10px;padding-bottom:10px;border-bottom:1px dashed #000}.client-name{font-size:16px;font-weight:800;text-transform:uppercase}.client-address{font-size:14px;margin-top:4px;font-weight:600;line-height:1.2}.item-box{padding:6px 0;border-bottom:1px dotted #999}.item-header{font-size:13px;font-weight:800;display:flex;justify-content:space-between}.item-details{margin-top:2px;font-size:11px;color:#000;white-space:pre-wrap;line-height:1.2;padding-left:5px}.totals{margin-top:10px}.row{display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px}.total-final{font-size:24px;font-weight:900;text-align:right;border-top:2px solid #000;margin-top:10px;padding-top:5px}.payment{font-size:12px;border:1px solid #000;padding:5px;text-align:center;font-weight:800;margin-top:5px}.obs{background:#000;color:#fff;padding:5px;font-weight:bold;font-size:12px;text-align:center;margin-top:5px}.footer{text-align:center;margin-top:10px;font-size:10px;margin-bottom:20px}@media print{body{-webkit-print-color-adjust:exact}}</style></head><body><div class="header"><div class="title">BEST DOG</div><div class="meta"><span>#${p.id}</span><span>${p.hora}</span></div></div><div class="section"><div class="client-name">${p.cliente?.nome||'CLIENTE BALCÃO'}</div><div class="client-address">${p.cliente?.endereco||'Retirada'}</div><div>${p.cliente?.telefone||''}</div></div><div class="section">${p.itens.map(i=>{const pBase=Number(i.preco||0);const pOpcoes=(i.opcoesSelecionadas||[]).reduce((s,op)=>s+extrairValorOpcao(op),0);const pAdics=i.listaAdicionais?i.listaAdicionais.reduce((s,adId)=>{const pr=produtos.find(x=>x.id===adId);return s+(pr?Number(pr.preco):0)},0):0;const totalItem=(pBase+pOpcoes+pAdics)*i.qtd;let detalhesTexto="";if(i.produtoId===999){detalhesTexto=i.opcoesSelecionadas?i.opcoesSelecionadas[0]:""}else{if(i.opcoesSelecionadas&&i.opcoesSelecionadas.length>0){i.opcoesSelecionadas.forEach(op=>detalhesTexto+=`> ${extrairNomeOpcao(op)}\n`)}if(i.listaAdicionais?.length>0)i.listaAdicionais.forEach(adId=>{const ad=produtos.find(x=>x.id===adId);if(ad)detalhesTexto+=`+ ${ad.nome} (${formatarMoeda(ad.preco)})\n`})}return `<div class="item-box"><div class="item-header"><span>${i.qtd}x ${i.nome.toUpperCase()}</span><span>${formatarMoeda(totalItem)}</span></div>${detalhesTexto?`<div class="item-details">${detalhesTexto}</div>`:''}</div>`}).join('')}</div>${p.observacoes?`<div class="obs">OBS: ${p.observacoes.toUpperCase()}</div>`:''}<div class="totals"><div class="row"><span>Subtotal</span><span>${formatarMoeda(subtotal)}</span></div>${p.desconto>0?`<div class="row"><span>Desc. (${p.desconto}%)</span><span>- ${formatarMoeda(descontoVal)}</span></div>`:''}<div class="row"><span>Entrega</span><span>${formatarMoeda(Number(p.taxa_entrega))}</span></div><div class="total-final">TOTAL: ${formatarMoeda(totalFinal)}</div><div class="payment">${p.pagamento}${p.pagamento==='Dinheiro'&&p.troco_para?`<br>Troco p/ ${formatarMoeda(p.troco_para)}<br>Devolver: ${formatarMoeda(troco)}`:''}</div></div><div class="footer">*** Obrigado pela preferência! ***</div></body></html>`;
-    const win = window.open('', '_blank', 'width=400,height=600'); if(win){win.document.write(conteudoHtml);win.document.close();}else{alert("Pop-up bloqueado!");}
-  };
-
-  if (loading) return <div className="h-screen flex items-center justify-center bg-zinc-950 text-white"><Loader2 className="animate-spin mr-2"/> Carregando...</div>;
-
-  return (
-    <div className={`flex h-screen font-sans overflow-hidden ${darkMode ? 'dark bg-slate-900' : 'bg-amber-50'}`}>
-      <audio id="audio-alerta" src={SOM_URL} />
-
-      {/* SIDEBAR */}
-      <aside className="hidden md:flex flex-col w-64 bg-slate-900 dark:bg-black border-r border-slate-800 text-white shadow-2xl z-20">
-        <div className="p-6 flex items-center gap-3 border-b border-slate-800">
-          {logoUrl ? <img src={logoUrl} alt="Logo" className="w-10 h-10 rounded-lg object-cover ring-2 ring-slate-700"/> : <div className="bg-gradient-to-br from-yellow-500 to-red-600 p-2 rounded-xl shadow-lg transform -rotate-6"><Utensils size={24} className="text-white"/></div>}
-          <div><h1 className="font-extrabold text-2xl tracking-tight italic text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-500">BEST DOG</h1><p className="text-xs text-slate-400 font-bold">Online v46.0</p></div>
-        </div>
-        <nav className="flex-1 p-4 space-y-2">
-           {[ { id: 'dashboard', icon: Home, label: 'Visão Geral' }, { id: 'montagem', icon: Layers, label: 'Monte seu Dog' }, { id: 'pedidos', icon: ClipboardList, label: 'Pedidos', count: pedidosPendentes.length }, { id: 'vendas', icon: DollarSign, label: 'Caixa & Gestão' }, { id: 'produtos', icon: Package, label: 'Cardápio' }, { id: 'clientes', icon: Users, label: 'Clientes' }, { id: 'config', icon: Settings, label: 'Configurações' }].map(item => (
-             <button key={item.id} onClick={() => setAbaAtiva(item.id)} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 font-bold ${abaAtiva === item.id ? 'bg-gradient-to-r from-red-600 to-red-700 text-yellow-100 shadow-md scale-[1.02]' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><div className="flex items-center gap-3"><item.icon size={20} className={abaAtiva === item.id ? 'text-yellow-300' : ''}/> <span>{item.label}</span></div>{item.id === 'pedidos' && item.count > 0 && <span className="bg-yellow-500 text-red-900 text-xs font-black px-2 py-0.5 rounded-full">{item.count}</span>}</button>
-           ))}
-        </nav>
-        <div className="p-4 border-t border-slate-800 flex justify-center"><button onClick={() => setDarkMode(!darkMode)} className="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-full text-sm font-bold hover:bg-slate-700 transition-colors text-yellow-400">{darkMode ? <Sun size={16}/> : <Moon size={16}/>} {darkMode ? 'Claro' : 'Escuro'}</button></div>
-      </aside>
-
-      {/* MAIN CONTENT */}
-      <main className="flex-1 overflow-y-auto relative flex flex-col bg-amber-50/50 dark:bg-slate-900 transition-colors duration-300">
-        <header className="md:hidden bg-slate-900 dark:bg-black text-white p-4 flex justify-between items-center shadow-md sticky top-0 z-10 border-b-2 border-yellow-600">
-           <div className="flex items-center gap-2 font-extrabold italic text-xl">{logoUrl ? <img src={logoUrl} alt="Logo" className="w-8 h-8 rounded object-cover"/> : <Utensils className="text-yellow-500"/>} BEST DOG</div>
-           <div className="flex gap-3 items-center"><button onClick={() => setDarkMode(!darkMode)} className="text-yellow-400">{darkMode ? <Sun size={20}/> : <Moon size={20}/>}</button>{pedidosPendentes.length > 0 && <span className="text-xs bg-red-600 text-yellow-100 font-bold px-3 py-1 rounded-full shadow-sm">{pedidosPendentes.length}</span>}</div>
-        </header>
-        <div className="p-4 md:p-8 pb-24 md:pb-8 max-w-7xl mx-auto w-full">
-            {abaAtiva === 'dashboard' && (<div className="space-y-4"><button onClick={abrirNovoPedido} className="w-full bg-gradient-to-br from-red-600 to-orange-600 text-yellow-100 py-5 rounded-2xl shadow-lg shadow-red-200/50 hover:from-red-700 hover:to-orange-700 transition transform active:scale-95 font-black text-xl md:text-2xl flex justify-center items-center gap-3 border-4 border-white dark:border-slate-700 ring-2 ring-red-100 dark:ring-red-900"><Plus size={32} strokeWidth={3} className="bg-white text-red-600 rounded-full p-1"/> NOVO PEDIDO AGORA</button><button onClick={abrirMonteDog} className="w-full py-4 bg-indigo-600 dark:bg-indigo-700 text-white font-extrabold rounded-xl shadow-md hover:bg-indigo-700 dark:hover:bg-indigo-600 flex justify-center items-center gap-3 border-b-4 border-indigo-800 active:border-b-0 active:translate-y-1 transition-all"><Edit3 size={22} className="text-yellow-300"/> MONTE SEU DOG (Personalizado)</button><div className="mt-4"><h3 className="font-extrabold text-gray-700 dark:text-gray-300 flex items-center gap-2 mb-3 uppercase text-sm tracking-wider"><Flame size={18} className="text-orange-500"/> Fila de Produção ({pedidosPendentes.length})</h3><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">{pedidosPendentes.length === 0 ? <div className="col-span-full text-center p-10 bg-white/50 dark:bg-slate-800/50 rounded-xl border-2 border-dashed border-amber-200 dark:border-slate-700 text-gray-400 italic">Nenhum pedido na chapa...</div> : pedidosPendentes.map(p => (<div key={p.id} className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-amber-100 dark:border-slate-700 flex flex-col relative overflow-hidden hover:shadow-md transition-shadow"><div className={`h-1 w-full ${p.status === 'Saiu para Entrega' ? 'bg-orange-500' : 'bg-red-500'}`}></div><div className="p-3 flex flex-col gap-1"><div className="flex justify-between items-center"><span className="font-black text-gray-800 dark:text-white text-lg">#{p.id}</span><div className="flex items-center gap-2"><button onClick={() => abrirNoMaps(p.cliente?.endereco || '')} className="text-blue-500 bg-blue-50 dark:bg-slate-700 p-1 rounded hover:bg-blue-100"><Map size={14}/></button><Badge status={p.status}/></div></div><div className="text-sm font-bold text-gray-700 dark:text-gray-300 truncate">{p.cliente?.nome}</div><div className="text-xs text-gray-400 mb-2 flex items-center gap-1"><Utensils size={10}/> {(p.itens||[]).length} itens • {p.hora}</div><div className="text-xs text-gray-600 dark:text-gray-400 bg-amber-50/50 dark:bg-slate-700/50 border-l-4 border-amber-300 dark:border-slate-600 pl-2 py-1 mb-2 font-medium">{(p.itens||[]).map(i => `${i.qtd}x ${i.nome}`).join(', ').substring(0, 60)}{p.itens?.length > 2 ? '...' : ''}</div><div className="flex justify-between items-end mt-auto pt-2 border-t border-gray-50 dark:border-slate-700"><div><div className="text-[10px] uppercase text-gray-400 font-bold">{p.pagamento}</div><div className="font-black text-red-600 dark:text-red-400 text-lg">{formatarMoeda(p.total)}</div></div><div className="flex gap-1"><button onClick={() => imprimir(p)} className="p-1.5 bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-slate-600"><Printer size={14}/></button><button onClick={() => enviarZap(p)} className="p-1.5 bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400 rounded hover:bg-green-200"><MessageCircle size={14}/></button><button onClick={() => editarPedido(p)} className="p-1.5 bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 rounded hover:bg-amber-200"><Pencil size={14}/></button></div></div></div><button onClick={() => avançarStatus(p.id)} className={`w-full py-2 text-xs font-bold text-white flex items-center justify-center gap-1 ${p.status === 'Pendente' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}>{p.status === 'Pendente' ? <><ArrowRight size={14}/> MANDAR ENTREGA</> : <><CheckCircle size={14}/> CONCLUIR</>}</button></div>))}</div></div></div>)}
-
-            {/* OUTRAS ABAS */}
-            {abaAtiva === 'montagem' && <div className="space-y-6 animate-fade-in"><div className="flex justify-between items-center mb-4"><h2 className="text-2xl font-extrabold text-indigo-800 dark:text-indigo-300 italic flex items-center gap-2"><Layers className="text-indigo-600"/> Itens de Montagem</h2></div><Card className="p-4 bg-indigo-50 dark:bg-slate-700 border-indigo-200 dark:border-slate-600"><h4 className="font-bold text-indigo-800 dark:text-white text-sm mb-2">Cadastrar Opção</h4><div className="flex gap-2 mb-2"><select className="border rounded p-2 text-xs w-32 dark:bg-slate-800 dark:text-white dark:border-slate-600" value={novoItemMontagem.categoria} onChange={e => setNovoItemMontagem({...novoItemMontagem, categoria: e.target.value})}><option value="paes">Pães</option><option value="queijos">Queijos</option><option value="salsichas">Salsichas</option><option value="molhos">Molhos</option><option value="adicionais">Adicionais</option></select><input placeholder="Nome do Item" className="flex-1 border rounded p-2 text-xs dark:bg-slate-800 dark:text-white dark:border-slate-600" value={novoItemMontagem.nome} onChange={e => setNovoItemMontagem({...novoItemMontagem, nome: e.target.value})}/><input placeholder="R$ Extra" type="number" className="w-20 border rounded p-2 text-xs dark:bg-slate-800 dark:text-white dark:border-slate-600" value={novoItemMontagem.valor} onChange={e => setNovoItemMontagem({...novoItemMontagem, valor: e.target.value})}/><button onClick={adicionarItemConfig} className="bg-indigo-600 text-white px-3 rounded text-xs font-bold">Salvar</button></div></Card><div className="grid grid-cols-1 md:grid-cols-2 gap-4">{[{key: 'paes', title: '1. Pães'},{key: 'queijos', title: '2. Queijos'},{key: 'salsichas', title: '3. Salsichas'},{key: 'molhos', title: '4. Molhos'},{key: 'adicionais', title: '5. Adicionais'}].map(grupo => (<Card key={grupo.key} className="p-4 border-gray-200 dark:border-slate-700"><h5 className="font-bold text-gray-700 dark:text-gray-300 text-xs uppercase mb-2 border-b pb-1 dark:border-slate-600">{grupo.title}</h5><div className="space-y-1">{configMontagem[grupo.key].map(item => (<div key={item.id} className="flex justify-between text-xs bg-gray-50 dark:bg-slate-900 p-2 rounded text-gray-700 dark:text-gray-300 border border-gray-100 dark:border-slate-700"><span>{item.nome}</span><span>{item.valor > 0 ? `+${formatarMoeda(item.valor)}` : 'Grátis'} <button onClick={() => removerItemConfig(grupo.key, item.id)} className="text-red-500 ml-2 font-bold hover:text-red-700">x</button></span></div>))}</div></Card>))}</div></div>}
-            {abaAtiva === 'pedidos' && <div className="space-y-4"><div className="flex justify-between items-center mb-2"><h2 className="text-xl font-bold text-gray-800 dark:text-white">Lista Detalhada</h2></div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{pedidosPendentes.map(p => (<div key={p.id} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-amber-100 dark:border-slate-700 overflow-hidden p-5"><div className="flex justify-between"><strong className="dark:text-white">#{p.id}</strong><Badge status={p.status}/></div><div className="mt-2"><p className="font-bold dark:text-gray-200">{p.cliente?.nome}</p><p className="text-xs text-gray-500">{p.cliente?.endereco}</p></div><div className="bg-gray-50 dark:bg-slate-700 p-2 rounded text-sm mt-2 dark:text-gray-300">{(p.itens||[]).map((i, idx) => (<div key={idx}>{i.qtd}x {i.nome}</div>))}</div><div className="flex justify-between items-center mt-3 pt-3 border-t dark:border-gray-700"><span className="font-black text-red-600 dark:text-red-400">{formatarMoeda(p.total)}</span><div className="flex gap-2"><button onClick={() => editarPedido(p)} className="text-xs bg-gray-100 dark:bg-slate-600 px-2 py-1 rounded dark:text-white">Editar</button><button onClick={() => cancelarPedido(p.id)} className="text-xs bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 px-2 py-1 rounded">Cancelar</button></div></div></div>))}</div></div>}
-            {/* Outras abas como Vendas, Produtos, Clientes e Configurações também devem ser renderizadas aqui, seguindo o padrão acima, mas omitidas para brevidade. O código completo da v41 tinha elas. */}
-        </div>
-
-        {/* BOTTOM BAR */}
-        <div className="md:hidden fixed bottom-0 left-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t-2 border-red-100 dark:border-slate-800 flex justify-around p-2 z-20 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-           <button onClick={() => setAbaAtiva('dashboard')} className={`flex flex-col items-center p-2 rounded-xl transition-colors ${abaAtiva === 'dashboard' ? 'text-red-600 bg-red-50 dark:bg-red-900/20' : 'text-gray-400'}`}><Home size={20}/><span className="text-[10px] font-bold">Início</span></button>
-           <button onClick={() => setAbaAtiva('pedidos')} className={`flex flex-col items-center p-2 rounded-xl transition-colors ${abaAtiva === 'pedidos' ? 'text-red-600 bg-red-50 dark:bg-red-900/20' : 'text-gray-400'}`}><ClipboardList size={20}/><span className="text-[10px] font-bold">Pedidos</span></button>
-           <button onClick={abrirNovoPedido} className="bg-gradient-to-r from-red-600 to-orange-500 text-yellow-100 rounded-full p-3 -mt-8 shadow-lg border-4 border-white dark:border-slate-900 active:scale-95 transition-transform"><Plus size={32} strokeWidth={3}/></button>
-           <button onClick={() => setAbaAtiva('vendas')} className={`flex flex-col items-center p-2 rounded-xl transition-colors ${abaAtiva === 'vendas' ? 'text-red-600 bg-red-50 dark:bg-red-900/20' : 'text-gray-400'}`}><DollarSign size={20}/><span className="text-[10px] font-bold">Caixa</span></button>
-           <button onClick={() => setAbaAtiva('produtos')} className={`flex flex-col items-center p-2 rounded-xl transition-colors ${abaAtiva === 'produtos' ? 'text-red-600 bg-red-50 dark:bg-red-900/20' : 'text-gray-400'}`}><ChefHat size={20}/><span className="text-[10px] font-bold">Menu</span></button>
-        </div>
-      </main>
-
-      {/* MODAIS (Reutilizar os mesmos da versão v41 para completar o código) */}
-      {/* ... Inserir aqui Modais de Produto, Cliente, Monte seu Dog e Novo Pedido ... */}
-      {modalMonteDogAberto && (
-        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-               <div className="bg-indigo-600 p-4 text-white font-black text-xl flex justify-between items-center shadow-sm">
-                   <div className="flex items-center gap-2"><Edit3/> MONTE SEU DOG</div>
-                   <button onClick={() => setModalMonteDogAberto(false)} className="bg-white/20 p-1 rounded hover:bg-white/40"><X/></button>
-               </div>
-               <div className="p-6 overflow-y-auto space-y-6 bg-indigo-50/30 flex-1">
-                   {/* Renderização dos grupos de montagem */}
-                   {['paes', 'queijos', 'salsichas', 'molhos', 'adicionais'].map((cat, idx) => (
-                       <div key={cat}>
-                           <h4 className="font-bold text-indigo-800 mb-2 flex items-center gap-2 uppercase text-sm"><span className="bg-indigo-200 w-6 h-6 rounded-full flex items-center justify-center text-xs">{idx+1}</span> {cat.charAt(0).toUpperCase() + cat.slice(1)}</h4>
-                           <div className="flex flex-wrap gap-2">
-                               {configMontagem[cat].map(item => (
-                                   <label key={item.id} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-sm ${['queijoIds', 'molhoIds', 'adicionalIds'].includes(cat === 'queijos' ? 'queijoIds' : cat === 'molhos' ? 'molhoIds' : 'adicionalIds') ? montagem[cat === 'queijos' ? 'queijoIds' : cat === 'molhos' ? 'molhoIds' : 'adicionalIds'].includes(item.id) ? 'bg-white border-green-500' : '' : montagem.paoId === item.id || montagem.salsichaId === item.id ? 'bg-indigo-100 border-indigo-500' : 'bg-white'}`}>
-                                       {['paes', 'salsichas'].includes(cat) ? 
-                                           <input type="radio" name={cat} className="hidden" checked={cat === 'paes' ? montagem.paoId === item.id : montagem.salsichaId === item.id} onChange={() => setMontagem({...montagem, [cat === 'paes' ? 'paoId' : 'salsichaId']: item.id})} /> :
-                                           <input type="checkbox" className="hidden" checked={montagem[cat === 'queijos' ? 'queijoIds' : cat === 'molhos' ? 'molhoIds' : 'adicionalIds'].includes(item.id)} onChange={() => toggleMultiplo(cat === 'queijos' ? 'queijoIds' : cat === 'molhos' ? 'molhoIds' : 'adicionalIds', item.id)} />
-                                       }
-                                       {item.nome} {item.valor > 0 && `(+${formatarMoeda(item.valor)})`}
-                                   </label>
-                               ))}
-                           </div>
-                       </div>
-                   ))}
-               </div>
-               <div className="p-4 bg-white border-t border-indigo-100"><button onClick={concluirMontagem} className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-4 rounded-xl font-black text-lg shadow-lg hover:scale-[1.02] transition-transform">ADICIONAR AO PEDIDO</button></div>
-           </div>
-        </div>
-      )}
-      
-      {modalPedidoAberto && (<div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 sm:p-6 animate-fade-in"><div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col border-4 border-amber-100"><div className="bg-gradient-to-r from-red-600 to-orange-600 text-white p-5 flex justify-between items-center"><h3 className="font-extrabold text-xl flex items-center gap-2 italic">{formPedido.id ? 'Editar Dogão' : 'Novo Pedido'}</h3><button onClick={() => setModalPedidoAberto(false)} className="bg-white/20 p-2 rounded-full hover:bg-white/40"><X size={20}/></button></div><div className="flex-1 overflow-y-auto p-6 bg-amber-50/50"><form onSubmit={salvarPedido} className="space-y-6"><Card className="p-5 border-red-100"><h4 className="font-bold text-red-800 mb-4 flex items-center gap-2 text-lg"><User size={20} className="text-red-500"/> Cliente</h4><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div><label className="text-xs font-bold text-gray-500 uppercase">Nome</label><input required className="w-full border-2 rounded-lg p-2.5" value={formPedido.nome} onChange={e => setFormPedido({...formPedido, nome: e.target.value})}/></div><div><label className="text-xs font-bold text-gray-500 uppercase">Endereço</label><input required className="w-full border-2 rounded-lg p-2.5" value={formPedido.endereco} onChange={e => setFormPedido({...formPedido, endereco: e.target.value})}/></div></div></Card><Card className="p-5 border-yellow-200 bg-yellow-50/30"><h4 className="font-bold text-yellow-800 mb-4 flex items-center gap-2 text-lg"><Utensils size={20} className="text-yellow-600"/> Itens</h4><div className="space-y-3">{formPedido.itens.map((item, idx) => (<div key={idx} className="bg-white p-4 rounded-xl border-2 border-yellow-100 shadow-sm relative"><div className="flex gap-2 items-start mb-3"><div className="w-20"><label className="text-[10px] uppercase font-bold text-gray-400">Qtd</label><input type="number" min="1" className="w-full border-2 border-gray-200 rounded-lg p-2 text-center font-black text-lg text-red-600" value={item.qtd} onChange={e => atualizarItem(idx, 'qtd', e.target.value)}/></div><div className="flex-1"><label className="text-[10px] uppercase font-bold text-gray-400">Produto</label>{item.produtoId === 999 ? <div className="w-full border-2 border-indigo-200 bg-indigo-50 rounded-lg p-2.5 font-bold text-indigo-800">{item.nome} (R$ {item.preco})</div> : <select required className="w-full border-2 border-gray-200 rounded-lg p-2.5 bg-white font-bold text-gray-800" value={item.produtoId} onChange={e => atualizarItem(idx, 'produtoId', e.target.value)}><option value="">Selecione...</option>{produtos.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}</select>}</div></div></div>))}</div></Card><div className="p-5 bg-white border-t-2 border-red-100 flex justify-between items-center"><button onClick={salvarPedido} className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-yellow-100 font-black py-4 px-10 rounded-full shadow-lg transition-all text-lg flex items-center gap-2">{formPedido.id ? 'SALVAR' : 'LANÇAR'}</button></div></form></div></div></div>)}
-    </div>
-  );
-}
-
-export default App;
+    const conteudoHtml = `<html><head><meta charset="utf-8"><style>@page{margin:0;size:80mm auto}body{margin:0;padding:5px;font-family:'Courier New',monospace;font-size:12px;color:#000;width:72mm;background:#fff}.header{text-align:center;margin-bottom:10px;border-bottom:2px solid #000;padding-bottom:10px}.title{font-size:20px;font-weight:900;margin:0}.meta{font-size:12px;display:flex;justify-content:space-between;margin-top:5px;font-weight:bold}.section{margin-bottom:10px;padding-bottom:10px;border-bottom:1px dashed #000}.client-name{font-size:16px;font-weight:800;text-transform:uppercase}.client-address{font-size:14px;margin-top:4px;font-weight:600;line-height:1.2}.item-box{padding:6px 0;border-bottom:1px dotted #999}.item-header{font-size:13px;font-weight:800;display:flex
